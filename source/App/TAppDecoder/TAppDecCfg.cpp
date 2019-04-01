@@ -58,6 +58,7 @@ namespace po = df::program_options_lite;
 /** \param argc number of arguments
     \param argv array of arguments
  */
+
 Bool TAppDecCfg::parseCfg( Int argc, TChar* argv[] )
 {
   Bool do_help = false;
