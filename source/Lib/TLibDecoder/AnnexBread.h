@@ -160,6 +160,11 @@ public:
     return val;
   }
 
+  std::istream& getInputStream()
+  {
+    return m_Input;
+  }
+
 #if RExt__DECODER_DEBUG_BIT_STATISTICS
   UInt GetNumBufferedBytes() const { return m_NumFutureBytes; }
 #endif
