@@ -36,7 +36,11 @@ public:
   NalStream(std::istream& istream);
   virtual ~NalStream();
 
-  InputNALUnit readNALUnit();
+  void readNALUnit();
+
+  ParameterSetManager getParameterSetManager()                        { return mParameterSetManager; }
+  void                setParameterSetManager(ParameterSetManager mP)  { mParameterSetManager = mP; }
+
 
 };
 

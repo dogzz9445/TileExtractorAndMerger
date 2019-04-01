@@ -1,4 +1,5 @@
-
+#ifndef _SLICEADDRESSTSRSORDER_H_
+#define _SLICEADDRESSTSRSORDER_H_
 #include "TLibCommon/TComSlice.h"
 
 class ExtTile
@@ -78,3 +79,5 @@ protected:
 	UInt               xCalculateNextCtuRSAddr(UInt uiCurrCtuRSAddr);
 
 };// END CLASS DEFINITION TComPicSym
+
+#endif // _SLICEADDRESSTSRSORDER_H_
