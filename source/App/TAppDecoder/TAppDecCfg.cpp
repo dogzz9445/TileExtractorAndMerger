@@ -66,10 +66,9 @@ Bool TAppDecCfg::parseCfg( Int argc, TChar* argv[] )
   string outputColourSpaceConvert;
   Int warnUnknowParameter = 0;
 
+  // FIXME: 
   po::Options opts;
   opts.addOptions()
-
-
   ("help",                      do_help,                               false,      "this help text")
   ("BitstreamFile,b",           m_bitstreamFileName,                   string(""), "bitstream input file name")
 	("OutBitstreamFile,o",				m_outBitstreamFileName,								 string(""), "bitstream output file name")
