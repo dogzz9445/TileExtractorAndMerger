@@ -8,14 +8,43 @@ NalStream::NalStream()
 {
 }
 
-NalStream::~NalStream()
+NalStream::NalStream(const char* filename)
+: mEntropyDecoder(TDecEntropy()),
+  mCavlcDecoder(TDecCavlc()),
+  mParameterSetManager(ParameterSetManager()),
+  mStats(AnnexBStats()),
+  mStream(filename, std::ifstream::in | std::ifstream::binary)
 {
+  if (!mStream.is_open())
+  {
+    std::cerr << "Warning: File is not opend\n";
+    exit(1);
+  }
 }
 
-void NalStream::readNALUnit()
+Void NalStream::addFile(const char* filename)
+{
+  if (mStream.is_open())
+  {
+    mStream.close();
+    mStream.clear();
+  }
+  
+  mStream.open(filename, std::ifstream::in | std::ifstream::binary);
+
+  if (!mStream.is_open())
+  {
+    std::cerr << "Warning: File is not opened\n";
+    exit(1);
+  }
+
+  mByteStream = new InputByteStream(mStream);
+}
+
+Void NalStream::readNALUnit()
 {
   InputNALUnit nalu;
-  byteStreamNALUnit(mByteStream, nalu.getBitstream().getFifo(), mStats);
+  byteStreamNALUnit(*mByteStream, nalu.getBitstream().getFifo(), mStats);
 
   read(nalu);
   if (nalu.getBitstream().getFifo().empty())

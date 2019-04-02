@@ -101,64 +101,42 @@ Void TAppDecTop::destroy()
  */
 Void TAppDecTop::decode()
 {
-  std::vector<NalStream*> vecNal;
-  std::vector<ifstream*> vecIFStream;
-  for (int i = 0; i < 1; i++)
+  NalStream* pNal;
+  std::vector<std::string> fileNames;
+  fileNames.push_back(std::string("pop.bin"));
+
+  pNal = new NalStream[fileNames.size()];
+  
+  for (int i = 0; i < fileNames.size(); i++)
   {
-    ifstream* bitstreamFile = new ifstream(m_bitstreamFileName.c_str(), ifstream::in | ifstream::binary);
-
-    if (!*bitstreamFile)
-    {
-      fprintf(stderr, "\nfailed to open bitstream file `%s' for reading\n", m_bitstreamFileName.c_str());
-      exit(EXIT_FAILURE);
-    }
-    NalStream *nalstream = new NalStream(*bitstreamFile);
-
-    vecNal.push_back(nalstream);
-    vecIFStream.push_back(bitstreamFile);
+    pNal[i].addFile(fileNames.at(i).c_str());
   }
 
   xInitDecLib  ();
 
-	Int					numCTUs;
-	Int					numTiles;
-	Int					currentTileId						= 0;
-	Int					countTile								= 0;
-	Int					bitsSliceSegmentAddress = 0;
-	SEIMCTSExtractionInfoSets *sei			= new SEIMCTSExtractionInfoSets;
+	//Int					numCTUs;
+	//Int					numTiles;
+	//Int					currentTileId						= 0;
+	//Int					countTile								= 0;
+	//Int					bitsSliceSegmentAddress = 0;
+	//SEIMCTSExtractionInfoSets *sei			= new SEIMCTSExtractionInfoSets;
 
   std::cout << "1:\n";
-  vecNal.at(0)->readNALUnit();
+  pNal[0].readNALUnit();
   std::cout << "2:\n";
-  vecNal.at(0)->readNALUnit();
+  pNal[0].readNALUnit();
   std::cout << "3:\n";
-  vecNal.at(0)->readNALUnit();
+  pNal[0].readNALUnit();
   std::cout << "4:\n";
-  vecNal.at(0)->readNALUnit();
+  pNal[0].readNALUnit();
   std::cout << "5:\n";
-  vecNal.at(0)->readNALUnit();
+  pNal[0].readNALUnit();
 
-
-  for (std::vector<ifstream*>::iterator it = vecIFStream.begin(); it != vecIFStream.end(); ++it)
+  if (pNal)
   {
-    ifstream* stream = *it;
-
-    if (stream)
-    {
-      (*stream).close();
-      delete stream;
-    }
+    delete[] pNal;
   }
 
-  for (std::vector<NalStream*>::iterator it = vecNal.begin(); it != vecNal.end(); ++it)
-  {
-    NalStream* stream = *it;
-
-    if (stream)
-    {
-      delete stream;
-    }
-  }
 }
 
 // ====================================================================================================================
