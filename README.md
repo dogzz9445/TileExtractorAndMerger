@@ -1,1 +1,1 @@
-# extractor
+# Tile Merger and Extractor
