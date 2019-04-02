@@ -107,7 +107,7 @@ Void TAppDecTop::decode()
   {
     ifstream* bitstreamFile = new ifstream(m_bitstreamFileName.c_str(), ifstream::in | ifstream::binary);
 
-    if (!bitstreamFile)
+    if (!*bitstreamFile)
     {
       fprintf(stderr, "\nfailed to open bitstream file `%s' for reading\n", m_bitstreamFileName.c_str());
       exit(EXIT_FAILURE);
@@ -145,6 +145,7 @@ Void TAppDecTop::decode()
 
     if (stream)
     {
+      (*stream).close();
       delete stream;
     }
   }

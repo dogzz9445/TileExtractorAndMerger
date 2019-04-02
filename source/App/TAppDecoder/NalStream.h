@@ -25,16 +25,22 @@ private:
   //std::istream& mNalStream;
   TDecEntropy mEntropyDecoder;
   TDecCavlc mCavlcDecoder;
-  InputByteStream mByteStream;
   ParameterSetManager mParameterSetManager;
   AnnexBStats mStats;
+  InputByteStream* mByteStream;
   //InputNALUnit mNalu;
   
 
 public:
   NalStream();
   NalStream(std::istream& istream);
-  virtual ~NalStream();
+  ~NalStream()
+  {
+    if (mByteStream)
+    {
+      delete mByteStream;
+    }
+  }
 
   void readNALUnit();
 

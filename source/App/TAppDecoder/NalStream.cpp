@@ -1,15 +1,12 @@
 #include "NalStream.h"
 
-NalStream::NalStream(std::istream& istream)
+NalStream::NalStream()
 : mEntropyDecoder(TDecEntropy()),
   mCavlcDecoder(TDecCavlc()),
   mParameterSetManager(ParameterSetManager()),
-  mStats(AnnexBStats()),
-  mByteStream(istream)
+  mStats(AnnexBStats())
 {
-
 }
-
 
 NalStream::~NalStream()
 {
