@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <assert.h>
+#include <fstream>
 
 #include "TLibDecoder/AnnexBread.h"
 #include "TLibDecoder/NALread.h"
@@ -22,21 +23,34 @@
 class NalStream
 {
 private:
-  std::istream& mNalStream;
+  std::ifstream mStream;
   TDecEntropy mEntropyDecoder;
   TDecCavlc mCavlcDecoder;
-  InputByteStream mByteStream;
   ParameterSetManager mParameterSetManager;
   AnnexBStats mStats;
-  InputNALUnit mNalu;
-  
+  InputByteStream* mByteStream;
+  //InputNALUnit mNalu;
 
 public:
   NalStream();
-  NalStream(std::istream& istream);
-  virtual ~NalStream();
+  NalStream(const char* filename);
+  ~NalStream()
+  {
+    if (mByteStream)
+    {
+      delete mByteStream;
+    }
+  }
 
-  InputNALUnit readNALUnit();
+  Void readNALUnit();
+  Void addFile(const char* filename);
+
+  TComVPS* getVPS();
+  TComSPS* getSPS();
+  TComPPS* getPPS();
+  ParameterSetManager getParameterSetManager()                        { return mParameterSetManager; }
+  void                setParameterSetManager(ParameterSetManager mP)  { mParameterSetManager = mP; }
+
 
 };
 

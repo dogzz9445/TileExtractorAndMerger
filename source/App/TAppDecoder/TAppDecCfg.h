@@ -63,6 +63,10 @@ protected:
 	Int           m_mctsTidTarget;
   std::string   m_outputDecodedSEIMessagesFilename;   ///< filename to output decoded SEI messages to. If '-', then use stdout. If empty, do not output details.
 
+  Int           m_numberOfTiles;
+  Int           m_numberOfTilesInColumn;
+  Int           m_numberOfTilesInRow;
+
 public:
   TAppDecCfg()
   : m_bitstreamFileName()

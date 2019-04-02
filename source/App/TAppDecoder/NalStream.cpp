@@ -1,26 +1,53 @@
 #include "NalStream.h"
 
-NalStream::NalStream(std::istream& istream) 
-: mEntropyDecoder(),
-  mCavlcDecoder(),
-  mParameterSetManager(),
-  mNalStream(istream),
-  mByteStream(mNalStream)
+NalStream::NalStream()
+: mEntropyDecoder(TDecEntropy()),
+  mCavlcDecoder(TDecCavlc()),
+  mParameterSetManager(ParameterSetManager()),
+  mStats(AnnexBStats())
 {
 
 }
 
-
-NalStream::~NalStream()
+NalStream::NalStream(const char* filename) 
+  : mEntropyDecoder(TDecEntropy()),
+  mCavlcDecoder(TDecCavlc()),
+  mParameterSetManager(ParameterSetManager()),
+  mStream(filename, std::ifstream::in | std::ifstream::binary))
 {
+  if (!mStream.is_open())
+  {
+    std::cerr << "Warning: File is not opened\n";
+    exit(1);
+  }
 }
 
-InputNALUnit NalStream::readNALUnit()
+Void NalStream::addFile(const char* filename)
 {
-  AnnexBStats stats = AnnexBStats();
+  if (mStream.is_open())
+  {
+    mStream.close();
+    mStream.clear();
+  }
+
+  mStream.open(filename, std::ifstream::in | std::ifstream::binary);
+
+  if (!mStream.is_open)
+  {
+    std::cerr << "Warning: File is not opened\n";
+    exit(1);
+  }
+
+  mByteStream = new InputByteStream(mStream);
+}
+
+
+
+Void NalStream::readNALUnit()
+{
   InputNALUnit nalu;
 
-  byteStreamNALUnit(mByteStream, nalu.getBitstream().getFifo(), stats);
+  byteStreamNALUnit(*mByteStream, nalu.getBitstream().getFifo(), mStats);
 
   read(nalu);
   if (nalu.getBitstream().getFifo().empty())
@@ -90,52 +117,77 @@ InputNALUnit NalStream::readNALUnit()
   case NAL_UNIT_CODED_SLICE_RASL_N:
   case NAL_UNIT_CODED_SLICE_RASL_R:
   {
-    if (sei->getNumberOfInfoSets() > 0)
-    {
-      if (m_mctsTidTarget >= nalu.m_temporalId)
-      {
-        vector<Int>& idxMCTSBuf = sei->infoSetData(m_mctsEisIdTarget).mctsSetData(m_mctsSetIdxTarget).getMCTSInSet();
-        if (std::find(idxMCTSBuf.begin(), idxMCTSBuf.end(), currentTileId++) != idxMCTSBuf.end())
-        {
-          m_apcSlicePilot->initSlice();
-          m_apcSlicePilot->setNalUnitType(nalu.m_nalUnitType);
-          Bool nonReferenceFlag = (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_TRAIL_N ||
-            m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_TSA_N ||
-            m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_STSA_N ||
-            m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RADL_N ||
-            m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N);
-          m_apcSlicePilot->setTemporalLayerNonReferenceFlag(nonReferenceFlag);
-          m_apcSlicePilot->setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
-          m_apcSlicePilot->setTLayerInfo(nalu.m_temporalId);
-          m_apcSlicePilot->setNumMCTSTile(sei->infoSetData(m_mctsEisIdTarget).mctsSetData(m_mctsSetIdxTarget).getNumberOfMCTSIdxs());
-          m_apcSlicePilot->setCountTile(countTile++);
-          m_cEntropyDecoder.decodeSliceHeader(m_apcSlicePilot, &m_oriParameterSetManager, &m_parameterSetManager, 0);
+    //if (sei->getNumberOfInfoSets() > 0)
+    //{
+    //  if (m_mctsTidTarget >= nalu.m_temporalId)
+    //  {
+    //    vector<Int>& idxMCTSBuf = sei->infoSetData(m_mctsEisIdTarget).mctsSetData(m_mctsSetIdxTarget).getMCTSInSet();
+    //    if (std::find(idxMCTSBuf.begin(), idxMCTSBuf.end(), currentTileId++) != idxMCTSBuf.end())
+    //    {
+    //      m_apcSlicePilot->initSlice();
+    //      m_apcSlicePilot->setNalUnitType(nalu.m_nalUnitType);
+    //      Bool nonReferenceFlag = (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_TRAIL_N ||
+    //        m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_TSA_N ||
+    //        m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_STSA_N ||
+    //        m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RADL_N ||
+    //        m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N);
+    //      m_apcSlicePilot->setTemporalLayerNonReferenceFlag(nonReferenceFlag);
+    //      m_apcSlicePilot->setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
+    //      m_apcSlicePilot->setTLayerInfo(nalu.m_temporalId);
+    //      m_apcSlicePilot->setNumMCTSTile(sei->infoSetData(m_mctsEisIdTarget).mctsSetData(m_mctsSetIdxTarget).getNumberOfMCTSIdxs());
+    //      m_apcSlicePilot->setCountTile(countTile++);
+    //      m_cEntropyDecoder.decodeSliceHeader(m_apcSlicePilot, &m_oriParameterSetManager, &m_parameterSetManager, 0);
 
-          Int sliceSegmentRsAddress = 0;
-          if (sei->infoSetData(m_mctsEisIdTarget).m_slice_reordering_enabled_flag)
-          {
-            sliceSegmentRsAddress = sei->infoSetData(m_mctsEisIdTarget).outputSliceSegmentAddress(m_apcSlicePilot->getCountTile());
-          }
-          else
-          {
-            sliceSegmentRsAddress = m_manageSliceAddress.getCtuTsToRsAddrMap((m_extNumCTUs / m_apcSlicePilot->getNumMCTSTile()) * m_apcSlicePilot->getCountTile());
-          }
-          m_apcSlicePilot->setSliceSegmentRsAddress(sliceSegmentRsAddress);
+    //      Int sliceSegmentRsAddress = 0;
+    //      if (sei->infoSetData(m_mctsEisIdTarget).m_slice_reordering_enabled_flag)
+    //      {
+    //        sliceSegmentRsAddress = sei->infoSetData(m_mctsEisIdTarget).outputSliceSegmentAddress(m_apcSlicePilot->getCountTile());
+    //      }
+    //      else
+    //      {
+    //        sliceSegmentRsAddress = m_manageSliceAddress.getCtuTsToRsAddrMap((m_extNumCTUs / m_apcSlicePilot->getNumMCTSTile()) * m_apcSlicePilot->getCountTile());
+    //      }
+    //      m_apcSlicePilot->setSliceSegmentRsAddress(sliceSegmentRsAddress);
 
-          writeSlice(mergedFile, nalu, m_apcSlicePilot);
-        }
-        if (currentTileId == numTiles)
-        {
-          currentTileId = 0;
-          countTile = 0;
-        }
-      }
-    }
-
+    //      writeSlice(mergedFile, nalu, m_apcSlicePilot);
+    //    }
+    //    if (currentTileId == numTiles)
+    //    {
+    //      currentTileId = 0;
+    //      countTile = 0;
+    //    }
+    //  }
+    //}
   }
   break;
   default:
     break;
   }
+}
 
+TComVPS* NalStream::getVPS()
+{ 
+  while (!mParameterSetManager.getFirstVPS())
+  {
+    readNALUnit();
+  }
+  return mParameterSetManager.getFirstVPS();
+}
+
+TComSPS* NalStream::getSPS()
+{
+  while (!mParameterSetManager.getFirstSPS())
+  {
+    readNALUnit();
+  }
+  return mParameterSetManager.getFirstSPS();
+}
+
+TComPPS* NalStream::getPPS()
+{
+  while (!mParameterSetManager.getFirstPPS())
+  {
+    readNALUnit();
+  }
+  return mParameterSetManager.getFirstPPS();
 }

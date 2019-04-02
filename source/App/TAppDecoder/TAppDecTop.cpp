@@ -99,7 +99,6 @@ Void TAppDecTop::destroy()
  */
 Void TAppDecTop::decode()
 {
-
   ifstream bitstreamFile(m_bitstreamFileName.c_str(), ifstream::in | ifstream::binary);
   if (!bitstreamFile)
   {

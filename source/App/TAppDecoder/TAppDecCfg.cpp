@@ -69,12 +69,15 @@ Bool TAppDecCfg::parseCfg( Int argc, TChar* argv[] )
   // FIXME: 
   po::Options opts;
   opts.addOptions()
-  ("help",                      do_help,                               false,      "this help text")
-  ("BitstreamFile,b",           m_bitstreamFileName,                   string(""), "bitstream input file name")
-	("OutBitstreamFile,o",				m_outBitstreamFileName,								 string(""), "bitstream output file name")
-	("MCTSEidIdTarget,-te",				m_mctsEisIdTarget,										 0,					 "target MCTS extraction information")
-	("MCTSSetIdxTarget,-ts",			m_mctsSetIdxTarget,										 0,					 "target MCTS set index")
-	("MCTSTidTarget,-tt",					m_mctsTidTarget,											 0,					 "target hightest Temporal id")
+  ("help",                      do_help,                    false,      "this help text")
+  ("BitstreamFile,b",           m_bitstreamFileName,        string(""), "bitstream input file name")
+	("OutBitstreamFile,o",				m_outBitstreamFileName,			string(""), "bitstream output file name")
+	("MCTSEidIdTarget,-te",				m_mctsEisIdTarget,					0,					 "target MCTS extraction information")
+	("MCTSSetIdxTarget,-ts",			m_mctsSetIdxTarget,					0,					 "target MCTS set index")
+	("MCTSTidTarget,-tt",					m_mctsTidTarget,					  0,					 "target hightest Temporal id")
+  ("NumberOfTiles,-nt",         m_numberOfTiles,            0, "this is for number of tiles")
+  ("NumberOfTilesInColumn,-ntc",m_numberOfTilesInColumn,    0, "this is for number of tiles in column")
+  ("NUmberOfTilesInRow,-ntr",   m_numberOfTilesInRow,       0, "this is for nubmer of tiles in row")
   ;
 
   po::setDefaults(opts);
