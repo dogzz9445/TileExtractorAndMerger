@@ -65,24 +65,31 @@ TAppDecTop::TAppDecTop()
  ,m_cEntropyCoder()
  ,m_parameterSetManager()
  ,m_oriParameterSetManager()
- ,m_apcSlicePilot(NULL)
  ,m_manageSliceAddress()
  ,m_extSPSId()
  ,m_extPPSId()
+ ,m_pNal(NULL)
 {
 }
 
 Void TAppDecTop::create()
 {
-	m_apcSlicePilot = new TComSlice;
-
 }
 
 Void TAppDecTop::destroy()
 {
   m_bitstreamFileName.clear();
-	delete m_apcSlicePilot;
-	m_apcSlicePilot = NULL;
+
+  //if (m_apcSlicePilot)
+  //{
+  //  delete m_apcSlicePilot;
+  //  m_apcSlicePilot = NULL;
+  //}
+  if (m_pNal)
+  {
+    delete[] m_pNal;
+    m_pNal = NULL;
+  }
 }
 
 // ====================================================================================================================
@@ -97,158 +104,220 @@ Void TAppDecTop::destroy()
  - destroy internal class
  .
  */
-Void TAppDecTop::decode()
+Void TAppDecTop::merge()
 {
-  ifstream bitstreamFile(m_bitstreamFileName.c_str(), ifstream::in | ifstream::binary);
-  if (!bitstreamFile)
+//---------TEST PARAMETER-------------------------------
+  // TEST PAPRAMETER
+  Int numTiles = m_numberOfTiles;
+
+  // TEST FILE NAME
+  std::vector<std::string> fileNames;
+  fileNames.resize(numTiles);
+
+//---------FILE IN/OUT STREAM---------------------------
+  // Input Stream
+  m_pNal = new NalStream[numTiles];
+  for (int i = 0; i < numTiles; i++)
   {
-    fprintf(stderr, "\nfailed to open bitstream file `%s' for reading\n", m_bitstreamFileName.c_str());
+    m_pNal[i].addFile(fileNames.at(i).c_str());
+  }
+
+  xInitDecLib();
+
+  // Output Stream
+  fstream mergedFile(m_outBitstreamFileName, fstream::binary | fstream::out);
+  if (!mergedFile)
+  {
+    std::cerr << "\nfailed to open bitstream file for writing\n";
     exit(EXIT_FAILURE);
   }
-  InputByteStream bytestream(bitstreamFile);
 
-  xInitDecLib  ();
-
-	Int					numCTUs;
-	Int					numTiles;
-	Int					currentTileId						= 0;
-	Int					countTile								= 0;
-	Int					bitsSliceSegmentAddress = 0;
-	SEIMCTSExtractionInfoSets *sei			= new SEIMCTSExtractionInfoSets;
-
-	fstream extractFile(m_outBitstreamFileName, fstream::binary | fstream::out);
-	if (!extractFile)
-	{
-		fprintf(stderr, "\nfailed to open bitstream file  for writing\n");
-		exit(EXIT_FAILURE);
-	}
-
-
-  while (!!bitstreamFile)
+//---------GOP 단위로 MERGING---------------------------
+//---------VPS, SPS, PPS-------------------------------
+  while (mergedFile.is_open())
   {
- 
-    AnnexBStats stats = AnnexBStats();
+    // VPS SPS, PPS 정보 파싱
+    for (Int iVPSSPSPPS = 0; iVPSSPSPPS < 3; iVPSSPSPPS++)
+    {
+      for (Int iTile = 0; iTile < numTiles; iTile++)
+      {
+        InputNALUnit nalu;
+        m_pNal[iTile].readNALUnit(nalu);
 
-    InputNALUnit nalu;
-    byteStreamNALUnit(bytestream, nalu.getBitstream().getFifo(), stats);
-		
-		read(nalu);
-		if (nalu.getBitstream().getFifo().empty())
-		{
-			fprintf(stderr, "Warning: Attempt to decode an empty NAL unit\n");
-		}
-		m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
-		m_cEntropyDecoder.setBitstream(&(nalu.getBitstream()));
+        std::cout << "--READ VPSSPSPPS--\NFILE: iTile: " << iTile <<
+          "NalType: " << nalu.m_nalUnitType << std::endl;
+      }
+    }
 
-		switch (nalu.m_nalUnitType)
-		{
-		case NAL_UNIT_SPS:
-			{
-				
-				TComSPS*		sps = new TComSPS();
-				m_cEntropyDecoder.decodeSPS(sps);
+    // VPS, SPS, PPS 정보 믹싱, 쓰기
+    {
+      // FIXME:
+      // first VPS, SPS, PPS 파싱해오는게 아니게 고쳐야됨
+      // VPS, SPS, PPS 정보 믹싱
+      InputNALUnit nalu_vps;
+      TComVPS* vps = m_pNal[0].getVPS(nalu_vps);
+      InputNALUnit nalu_sps;
+      TComSPS* sps = m_pNal[0].getSPS(nalu_sps);
+      InputNALUnit nalu_pps;
+      TComPPS* pps = m_pNal[0].getPPS(nalu_pps);
 
-				m_oriParameterSetManager.storeSPS(sps, nalu.getBitstream().getFifo());
-				numCTUs = ((sps->getPicWidthInLumaSamples() + sps->getMaxCUWidth() - 1) / sps->getMaxCUWidth())*((sps->getPicHeightInLumaSamples() + sps->getMaxCUHeight() - 1) / sps->getMaxCUHeight());
-				while (numCTUs>(1 << bitsSliceSegmentAddress))
-				{
-					bitsSliceSegmentAddress++;
-				}
-			}
-			break;
-		case NAL_UNIT_PPS:
-			{
-				TComPPS*		pps = new TComPPS();
-				m_cEntropyDecoder.decodePPS(pps);
-				m_oriParameterSetManager.storePPS(pps, nalu.getBitstream().getFifo());
-				numTiles = (pps->getNumTileColumnsMinus1() + 1) * (pps->getNumTileRowsMinus1() + 1);
-			}
-			break;
-		case NAL_UNIT_PREFIX_SEI:
-			{							
-				if (m_seiReader.parseSEImessage(*sei, &(nalu.getBitstream()), m_pSEIOutputStream, bitsSliceSegmentAddress))
-				{
-					replaceParameter(extractFile, *sei, m_mctsEisIdTarget, m_mctsSetIdxTarget, m_parameterSetManager);
-					m_manageSliceAddress.create(m_parameterSetManager.getSPS(m_extSPSId), m_parameterSetManager.getPPS(m_extPPSId));
-				}
-				else
-				{
-					vector<uint8_t> outputBuffer;
-					std::size_t outputAmount = 0;
-					outputAmount = addEmulationPreventionByte(outputBuffer, nalu.getBitstream().getFifo());
-					extractFile.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
-					extractFile.write(reinterpret_cast<const TChar*>(&(*outputBuffer.begin())), outputAmount);
-				}
-			}
-			break;
-		case NAL_UNIT_CODED_SLICE_TRAIL_R:
-		case NAL_UNIT_CODED_SLICE_TRAIL_N:
-		case NAL_UNIT_CODED_SLICE_TSA_R:
-		case NAL_UNIT_CODED_SLICE_TSA_N:
-		case NAL_UNIT_CODED_SLICE_STSA_R:
-		case NAL_UNIT_CODED_SLICE_STSA_N:
-		case NAL_UNIT_CODED_SLICE_BLA_W_LP:
-		case NAL_UNIT_CODED_SLICE_BLA_W_RADL:
-		case NAL_UNIT_CODED_SLICE_BLA_N_LP:
-		case NAL_UNIT_CODED_SLICE_IDR_W_RADL:
-		case NAL_UNIT_CODED_SLICE_IDR_N_LP:
-		case NAL_UNIT_CODED_SLICE_CRA:
-		case NAL_UNIT_CODED_SLICE_RADL_N:
-		case NAL_UNIT_CODED_SLICE_RADL_R:
-		case NAL_UNIT_CODED_SLICE_RASL_N:
-		case NAL_UNIT_CODED_SLICE_RASL_R:
-			{
-				if (sei->getNumberOfInfoSets() > 0)
+      // FIXME:
+      // VPS, SPS, PPS 수정해서 쓰기
+      writeVPSSPSPPS(mergedFile, vps, sps, pps);
+    }
+
+    for (Int iTile = 0; iTile < numTiles; iTile++)
+    {
+      // Tile 정보 mixing
+    }
+
+    //---------FRAME 단위로 SLICE 쓰기---------------------------
+    // FIXME:
+    // GOP 단위로 고쳐야됨
+    for (Int iFrame = 0; iFrame < /*max frame*/32; iFrame++)
+    {
+      for (Int iTile = 0; iTile < numTiles; iTile++)
+      {
+        //if (m_mctsTidTarget < nalu.m_temporalId)
+        InputNALUnit nalu;
+        m_pNal[iTile].getSliceNAL(nalu);
+
+        // FIXME:
+        // SEI Message면 다시 읽기
+        while (!(nalu.m_nalUnitType == NAL_UNIT_PREFIX_SEI))
         {
-          if (m_mctsTidTarget >= nalu.m_temporalId)
-          {
-            vector<Int>& idxMCTSBuf = sei->infoSetData(m_mctsEisIdTarget).mctsSetData(m_mctsSetIdxTarget).getMCTSInSet();
-            if (std::find(idxMCTSBuf.begin(), idxMCTSBuf.end(), currentTileId++) != idxMCTSBuf.end())
-            {
-              m_apcSlicePilot->initSlice();
-              m_apcSlicePilot->setNalUnitType(nalu.m_nalUnitType);
-              Bool nonReferenceFlag = (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_TRAIL_N ||
-                m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_TSA_N ||
-                m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_STSA_N ||
-                m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RADL_N ||
-                m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N);
-              m_apcSlicePilot->setTemporalLayerNonReferenceFlag(nonReferenceFlag);
-              m_apcSlicePilot->setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
-              m_apcSlicePilot->setTLayerInfo(nalu.m_temporalId);
-              m_apcSlicePilot->setNumMCTSTile(sei->infoSetData(m_mctsEisIdTarget).mctsSetData(m_mctsSetIdxTarget).getNumberOfMCTSIdxs());
-              m_apcSlicePilot->setCountTile(countTile++);
-              m_cEntropyDecoder.decodeSliceHeader(m_apcSlicePilot, &m_oriParameterSetManager, &m_parameterSetManager, 0);
+          m_pNal[iTile].getSliceNAL(nalu);
+        }
 
-              Int sliceSegmentRsAddress = 0;
-              if (sei->infoSetData(m_mctsEisIdTarget).m_slice_reordering_enabled_flag)
+        TComSlice slice;
+        slice.initSlice();
+        slice.setNalUnitType(nalu.m_nalUnitType);
+        Bool nonReferenceFlag = (
+          slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_TRAIL_N ||
+          slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_TSA_N ||
+          slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_STSA_N ||
+          slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_RADL_N ||
+          slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N
+          );
+        slice.setTemporalLayerNonReferenceFlag(nonReferenceFlag);
+        slice.setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
+        slice.setTLayerInfo(nalu.m_temporalId);
+        slice.setNumMCTSTile(sei->infoSetData(m_mctsEisIdTarget).mctsSetData(m_mctsSetIdxTarget).getNumberOfMCTSIdxs());
+        slice.setCountTile(countTile++);
+      }
+    }
+  } // end of (while (mergedFile.is_open()))
+
+
+		      switch (nalu.m_nalUnitType)
+		      {
+		      case NAL_UNIT_SPS:
+			      {
+				
+				      TComSPS*		sps = new TComSPS();
+				      m_cEntropyDecoder.decodeSPS(sps);
+
+				      m_oriParameterSetManager.storeSPS(sps, nalu.getBitstream().getFifo());
+				      numCTUs = ((sps->getPicWidthInLumaSamples() + sps->getMaxCUWidth() - 1) / sps->getMaxCUWidth())*((sps->getPicHeightInLumaSamples() + sps->getMaxCUHeight() - 1) / sps->getMaxCUHeight());
+				      while (numCTUs>(1 << bitsSliceSegmentAddress))
+				      {
+					      bitsSliceSegmentAddress++;
+				      }
+			      }
+			      break;
+		      case NAL_UNIT_PPS:
+			      {
+				      TComPPS*		pps = new TComPPS();
+				      m_cEntropyDecoder.decodePPS(pps);
+				      m_oriParameterSetManager.storePPS(pps, nalu.getBitstream().getFifo());
+				      numTiles = (pps->getNumTileColumnsMinus1() + 1) * (pps->getNumTileRowsMinus1() + 1);
+			      }
+			      break;
+		      case NAL_UNIT_PREFIX_SEI:
+			      {							
+				      if (m_seiReader.parseSEImessage(*sei, &(nalu.getBitstream()), m_pSEIOutputStream, bitsSliceSegmentAddress))
+				      {
+					      replaceParameter(extractFile, *sei, m_mctsEisIdTarget, m_mctsSetIdxTarget, m_parameterSetManager);
+					      m_manageSliceAddress.create(m_parameterSetManager.getSPS(m_extSPSId), m_parameterSetManager.getPPS(m_extPPSId));
+				      }
+				      else
+				      {
+					      vector<uint8_t> outputBuffer;
+					      std::size_t outputAmount = 0;
+					      outputAmount = addEmulationPreventionByte(outputBuffer, nalu.getBitstream().getFifo());
+					      extractFile.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
+					      extractFile.write(reinterpret_cast<const TChar*>(&(*outputBuffer.begin())), outputAmount);
+				      }
+			      }
+			      break;
+		      case NAL_UNIT_CODED_SLICE_TRAIL_R:
+		      case NAL_UNIT_CODED_SLICE_TRAIL_N:
+		      case NAL_UNIT_CODED_SLICE_TSA_R:
+		      case NAL_UNIT_CODED_SLICE_TSA_N:
+		      case NAL_UNIT_CODED_SLICE_STSA_R:
+		      case NAL_UNIT_CODED_SLICE_STSA_N:
+		      case NAL_UNIT_CODED_SLICE_BLA_W_LP:
+		      case NAL_UNIT_CODED_SLICE_BLA_W_RADL:
+		      case NAL_UNIT_CODED_SLICE_BLA_N_LP:
+		      case NAL_UNIT_CODED_SLICE_IDR_W_RADL:
+		      case NAL_UNIT_CODED_SLICE_IDR_N_LP:
+		      case NAL_UNIT_CODED_SLICE_CRA:
+		      case NAL_UNIT_CODED_SLICE_RADL_N:
+		      case NAL_UNIT_CODED_SLICE_RADL_R:
+		      case NAL_UNIT_CODED_SLICE_RASL_N:
+		      case NAL_UNIT_CODED_SLICE_RASL_R:
+			      {
+				      if (sei->getNumberOfInfoSets() > 0)
               {
-                sliceSegmentRsAddress = sei->infoSetData(m_mctsEisIdTarget).outputSliceSegmentAddress(m_apcSlicePilot->getCountTile());
-              }
-              else
-              {
-                sliceSegmentRsAddress = m_manageSliceAddress.getCtuTsToRsAddrMap((m_extNumCTUs / m_apcSlicePilot->getNumMCTSTile()) * m_apcSlicePilot->getCountTile());
-              }
-              m_apcSlicePilot->setSliceSegmentRsAddress(sliceSegmentRsAddress);
+                if (m_mctsTidTarget >= nalu.m_temporalId)
+                {
+                  vector<Int>& idxMCTSBuf = sei->infoSetData(m_mctsEisIdTarget).mctsSetData(m_mctsSetIdxTarget).getMCTSInSet();
+                  if (std::find(idxMCTSBuf.begin(), idxMCTSBuf.end(), currentTileId++) != idxMCTSBuf.end())
+                  {
+                    m_apcSlicePilot->initSlice();
+                    m_apcSlicePilot->setNalUnitType(nalu.m_nalUnitType);
+                    Bool nonReferenceFlag = (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_TRAIL_N ||
+                      m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_TSA_N ||
+                      m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_STSA_N ||
+                      m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RADL_N ||
+                      m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N);
+                    m_apcSlicePilot->setTemporalLayerNonReferenceFlag(nonReferenceFlag);
+                    m_apcSlicePilot->setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
+                    m_apcSlicePilot->setTLayerInfo(nalu.m_temporalId);
+                    m_apcSlicePilot->setNumMCTSTile(sei->infoSetData(m_mctsEisIdTarget).mctsSetData(m_mctsSetIdxTarget).getNumberOfMCTSIdxs());
+                    m_apcSlicePilot->setCountTile(countTile++);
+                    m_cEntropyDecoder.decodeSliceHeader(m_apcSlicePilot, &m_oriParameterSetManager, &m_parameterSetManager, 0);
 
-              writeSlice(extractFile, nalu, m_apcSlicePilot);
-            }
-            if (currentTileId == numTiles)
-            {
-              currentTileId = 0;
-              countTile = 0;
-            }
-          }
-				}
+                    Int sliceSegmentRsAddress = 0;
+                    if (sei->infoSetData(m_mctsEisIdTarget).m_slice_reordering_enabled_flag)
+                    {
+                      sliceSegmentRsAddress = sei->infoSetData(m_mctsEisIdTarget).outputSliceSegmentAddress(m_apcSlicePilot->getCountTile());
+                    }
+                    else
+                    {
+                      sliceSegmentRsAddress = m_manageSliceAddress.getCtuTsToRsAddrMap((m_extNumCTUs / m_apcSlicePilot->getNumMCTSTile()) * m_apcSlicePilot->getCountTile());
+                    }
+                    m_apcSlicePilot->setSliceSegmentRsAddress(sliceSegmentRsAddress);
 
-			}
-			break;
-		default:
-			break;
-		}
-		
-  }
-	extractFile.close();
+                    writeSlice(extractFile, nalu, m_apcSlicePilot);
+                  }
+                  if (currentTileId == numTiles)
+                  {
+                    currentTileId = 0;
+                    countTile = 0;
+                  }
+                }
+				      }
 
+			      }
+			      break;
+		      default:
+			      break;
+		      }
+
+//-----------OUTPUT STREAM CLOSE-------------
+  mergedFile.close();
+  mergedFile.clear();
 }
 
 // ====================================================================================================================
@@ -413,8 +482,8 @@ Void TAppDecTop::writeSlice(fstream& out, InputNALUnit& nalu, TComSlice* pcSlice
 	outputSliceHeaderAmount = addEmulationPreventionByte(outputSliceHeaderBuffer, bsSliceHeader.getFIFO());
 	out.write(reinterpret_cast<const TChar*>(&(*outputSliceHeaderBuffer.begin())), outputSliceHeaderAmount);
 
-	TComInputBitstream **ppcSubstreams = NULL;
-	TComInputBitstream* pcBitstream = &(nalu.getBitstream());
+	TComInputBitstream** ppcSubstreams = NULL;
+	TComInputBitstream*  pcBitstream = &(nalu.getBitstream());
 	const UInt uiNumSubstreams = pcSlice->getNumberOfSubstreamSizes() + 1;
 
 	// init each couple {EntropyDecoder, Substream}

@@ -53,8 +53,6 @@ int main(int argc, char* argv[])
   Int returnCode = EXIT_SUCCESS;
   TAppDecTop  cTAppDecTop;
 
-
-
   // create application decoder class
   cTAppDecTop.create();
 
@@ -68,7 +66,7 @@ int main(int argc, char* argv[])
 
 
   // call decoding function
-  cTAppDecTop.decode();
+  cTAppDecTop.merge();
 
   // destroy application decoder class
   cTAppDecTop.destroy();

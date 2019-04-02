@@ -6,19 +6,18 @@ NalStream::NalStream()
   mParameterSetManager(ParameterSetManager()),
   mStats(AnnexBStats())
 {
-
 }
 
 NalStream::NalStream(const char* filename) 
   : mEntropyDecoder(TDecEntropy()),
   mCavlcDecoder(TDecCavlc()),
   mParameterSetManager(ParameterSetManager()),
-  mStream(filename, std::ifstream::in | std::ifstream::binary))
+  mStream(filename, std::ifstream::in | std::ifstream::binary)
 {
   if (!mStream.is_open())
   {
     std::cerr << "Warning: File is not opened\n";
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -35,7 +34,7 @@ Void NalStream::addFile(const char* filename)
   if (!mStream.is_open)
   {
     std::cerr << "Warning: File is not opened\n";
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   mByteStream = new InputByteStream(mStream);
@@ -43,10 +42,8 @@ Void NalStream::addFile(const char* filename)
 
 
 
-Void NalStream::readNALUnit()
+Void NalStream::readNALUnit(InputNALUnit& nalu)
 {
-  InputNALUnit nalu;
-
   byteStreamNALUnit(*mByteStream, nalu.getBitstream().getFifo(), mStats);
 
   read(nalu);
@@ -56,7 +53,8 @@ Void NalStream::readNALUnit()
   }
   mEntropyDecoder.setEntropyDecoder(&mCavlcDecoder);
   mEntropyDecoder.setBitstream(&(nalu.getBitstream()));
-
+  
+  std::cout << nalUnitTypeToString(nalu.m_nalUnitType) << std::endl;
   switch (nalu.m_nalUnitType)
   {
   case NAL_UNIT_VPS:
@@ -165,29 +163,34 @@ Void NalStream::readNALUnit()
   }
 }
 
-TComVPS* NalStream::getVPS()
+TComVPS* NalStream::getVPS(InputNALUnit& nalu)
 { 
   while (!mParameterSetManager.getFirstVPS())
   {
-    readNALUnit();
+    readNALUnit(nalu);
   }
   return mParameterSetManager.getFirstVPS();
 }
 
-TComSPS* NalStream::getSPS()
+TComSPS* NalStream::getSPS(InputNALUnit& nalu)
 {
   while (!mParameterSetManager.getFirstSPS())
   {
-    readNALUnit();
+    readNALUnit(nalu);
   }
   return mParameterSetManager.getFirstSPS();
 }
 
-TComPPS* NalStream::getPPS()
+TComPPS* NalStream::getPPS(InputNALUnit& nalu)
 {
   while (!mParameterSetManager.getFirstPPS())
   {
-    readNALUnit();
+    readNALUnit(nalu);
   }
   return mParameterSetManager.getFirstPPS();
+}
+
+Void NalStream::getSliceNAL(InputNALUnit& nalu)
+{
+  readNALUnit(nalu);
 }

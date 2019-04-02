@@ -42,12 +42,14 @@ public:
     }
   }
 
-  Void readNALUnit();
+  Void readNALUnit(InputNALUnit& nalu);
   Void addFile(const char* filename);
 
-  TComVPS* getVPS();
-  TComSPS* getSPS();
-  TComPPS* getPPS();
+  TComVPS*   getVPS(InputNALUnit& nalu);
+  TComSPS*   getSPS(InputNALUnit& nalu);
+  TComPPS*   getPPS(InputNALUnit& nalu);
+  Void       getSliceNAL(InputNALUnit& nalu);
+
   ParameterSetManager getParameterSetManager()                        { return mParameterSetManager; }
   void                setParameterSetManager(ParameterSetManager mP)  { mParameterSetManager = mP; }
 

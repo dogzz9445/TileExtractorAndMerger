@@ -55,6 +55,7 @@
 #include "TLibDecoder/TDecCAVLC.h"
 #include "TLibDecoder/SliceAddressTsRsOrder.h"
 
+#include "NalStream.h"
 
 //! \ingroup TAppDecoder
 //! \{
@@ -77,7 +78,6 @@ private:
 	TEncCavlc												m_cCavlcCoder;
 	ParameterSetManager							m_oriParameterSetManager;
 	ParameterSetManager							m_parameterSetManager;
-	TComSlice*											m_apcSlicePilot;
 	SliceAddressTsRsOrder						m_manageSliceAddress;
 	Int															m_extSPSId;
 	Int															m_extPPSId;
@@ -85,13 +85,15 @@ private:
 	
   std::ofstream                   m_seiMessageFileStream;         ///< Used for outputing SEI messages.
 
+  NalStream * m_pNal;
+
 public:
   TAppDecTop();
   virtual ~TAppDecTop() {}
 
   Void  create            (); ///< create internal members
   Void  destroy           (); ///< destroy internal members
-  Void  decode            (); ///< main decoding function
+  Void  merge             (); ///< main decoding function
 
 	//edit JW
 	Void  setSEIMessageOutputStream(std::ostream *pOpStream) { m_pSEIOutputStream = pOpStream; }
@@ -106,6 +108,9 @@ private:
 	Void writeParameter(fstream& out, NalUnitType nalUnitType, UInt temporalId, UInt nuhLayerId, vector<uint8_t>& rbsp, ParameterSetManager& parameterSetmanager);
   Void replaceParameter(fstream& out, SEIMCTSExtractionInfoSets& sei, Int mctsEisIdTarget, Int mctsSetIdxTarget, ParameterSetManager& parameterSetmanager);
 	Void writeSlice(fstream& out, InputNALUnit& nalu, TComSlice* pcSlice);
+
+  //edit DM
+  Void writeVPSSPSPPS(fstream& out, TComVPS* vps, TComSPS* sps, TComPPS* pps);
 };
 
 //! \}
