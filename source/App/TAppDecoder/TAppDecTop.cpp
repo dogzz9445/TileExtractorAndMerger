@@ -101,19 +101,21 @@ Void TAppDecTop::destroy()
  */
 Void TAppDecTop::decode()
 {
-  std::vector<NalStream> vecNal;
+  std::vector<NalStream*> vecNal;
+  std::vector<ifstream*> vecIFStream;
   for (int i = 0; i < 1; i++)
   {
-    ifstream bitstreamFile(m_bitstreamFileName.c_str(), ifstream::in | ifstream::binary);
+    ifstream* bitstreamFile = new ifstream(m_bitstreamFileName.c_str(), ifstream::in | ifstream::binary);
+
     if (!bitstreamFile)
     {
       fprintf(stderr, "\nfailed to open bitstream file `%s' for reading\n", m_bitstreamFileName.c_str());
       exit(EXIT_FAILURE);
     }
-
-    NalStream nalstream(bitstreamFile);
+    NalStream *nalstream = new NalStream(*bitstreamFile);
 
     vecNal.push_back(nalstream);
+    vecIFStream.push_back(bitstreamFile);
   }
 
   xInitDecLib  ();
@@ -126,17 +128,36 @@ Void TAppDecTop::decode()
 	SEIMCTSExtractionInfoSets *sei			= new SEIMCTSExtractionInfoSets;
 
   std::cout << "1:\n";
-  vecNal.at(0).readNALUnit();
+  vecNal.at(0)->readNALUnit();
   std::cout << "2:\n";
-  vecNal.at(0).readNALUnit();
+  vecNal.at(0)->readNALUnit();
   std::cout << "3:\n";
-  vecNal.at(0).readNALUnit();
+  vecNal.at(0)->readNALUnit();
   std::cout << "4:\n";
-  vecNal.at(0).readNALUnit();
+  vecNal.at(0)->readNALUnit();
   std::cout << "5:\n";
-  vecNal.at(0).readNALUnit();
+  vecNal.at(0)->readNALUnit();
 
 
+  for (std::vector<ifstream*>::iterator it = vecIFStream.begin(); it != vecIFStream.end(); ++it)
+  {
+    ifstream* stream = *it;
+
+    if (stream)
+    {
+      delete stream;
+    }
+  }
+
+  for (std::vector<NalStream*>::iterator it = vecNal.begin(); it != vecNal.end(); ++it)
+  {
+    NalStream* stream = *it;
+
+    if (stream)
+    {
+      delete stream;
+    }
+  }
 }
 
 // ====================================================================================================================

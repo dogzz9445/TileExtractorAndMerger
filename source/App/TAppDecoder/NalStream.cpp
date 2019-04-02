@@ -1,13 +1,11 @@
 #include "NalStream.h"
 
 NalStream::NalStream(std::istream& istream)
-: mEntropyDecoder(),
-  mCavlcDecoder(),
-  mParameterSetManager(),
+: mEntropyDecoder(TDecEntropy()),
+  mCavlcDecoder(TDecCavlc()),
+  mParameterSetManager(ParameterSetManager()),
   mStats(AnnexBStats()),
-  mNalu(),
-  mNalStream(istream),
-  mByteStream(mNalStream)
+  mByteStream(istream)
 {
 
 }
@@ -19,33 +17,35 @@ NalStream::~NalStream()
 
 void NalStream::readNALUnit()
 {
-  byteStreamNALUnit(mByteStream, mNalu.getBitstream().getFifo(), mStats);
+  InputNALUnit nalu;
+  byteStreamNALUnit(mByteStream, nalu.getBitstream().getFifo(), mStats);
 
-  read(mNalu);
-  if (mNalu.getBitstream().getFifo().empty())
+  read(nalu);
+  if (nalu.getBitstream().getFifo().empty())
   {
     std::cerr << "Waring: Attempt to decode an empty NAL unit\n";
   }
   mEntropyDecoder.setEntropyDecoder(&mCavlcDecoder);
-  mEntropyDecoder.setBitstream(&(mNalu.getBitstream()));
+  mEntropyDecoder.setBitstream(&(nalu.getBitstream()));
 
-  std::cout << "NalType: " << nalUnitTypeToString(mNalu.m_nalUnitType) << std::endl;
+  std::cout << "NalType: " << nalUnitTypeToString(nalu.m_nalUnitType) << std::endl;
 
-  switch (mNalu.m_nalUnitType)
+  switch (nalu.m_nalUnitType)
   {
   case NAL_UNIT_VPS:
   {
     TComVPS*    vps = new TComVPS();
     mEntropyDecoder.decodeVPS(vps);
-
-    mParameterSetManager.storeVPS(vps, mNalu.getBitstream().getFifo());
+    
+    mParameterSetManager.storeVPS(vps, nalu.getBitstream().getFifo());
   }
+  break;
   case NAL_UNIT_SPS:
   {
     TComSPS*		sps = new TComSPS();
     mEntropyDecoder.decodeSPS(sps);
 
-    mParameterSetManager.storeSPS(sps, mNalu.getBitstream().getFifo());
+    mParameterSetManager.storeSPS(sps, nalu.getBitstream().getFifo());
   }
   break;
   case NAL_UNIT_PPS:
@@ -53,7 +53,7 @@ void NalStream::readNALUnit()
     TComPPS*		pps = new TComPPS();
     mEntropyDecoder.decodePPS(pps); 
 
-    mParameterSetManager.storePPS(pps, mNalu.getBitstream().getFifo());
+    mParameterSetManager.storePPS(pps, nalu.getBitstream().getFifo());
   }
   break;
   case NAL_UNIT_PREFIX_SEI:
