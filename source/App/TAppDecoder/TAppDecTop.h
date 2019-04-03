@@ -82,7 +82,8 @@ private:
 	std::ostream									 *m_pSEIOutputStream;
   TEncEntropy											m_cEntropyCoder;
   TDecEntropy											m_cEntropyDecoder;
-	TEncCavlc												m_cCavlcCoder;
+  TEncCavlc												m_cCavlcCoder;
+  TDecCavlc												m_cCavlcDecoder;
 	ParameterSetManager							m_oriParameterSetManager;
 	ParameterSetManager							m_parameterSetManager;
 	SliceAddressTsRsOrder						m_manageSliceAddress;
@@ -119,10 +120,10 @@ private:
 
   //edit DM
   Void xWriteVPSSPSPPS(std::ostream& out, TComVPS* vps, TComSPS* sps, TComPPS* pps);
-  Void xWriteVPS(AccessUnit &accessUnit, TComVPS* vps);
-  Void xWriteSPS(AccessUnit &accessUnit, TComSPS* sps);
-  Void xWritePPS(AccessUnit &accessUnit, TComPPS* pps);
-  Void xWriteBitstream(std::ostream& out, AccessUnit &accessUnit/*, TComSlice* slice*/);
+  Void xWriteVPS(AccessUnit& accessUnit, TComVPS* vps);
+  Void xWriteSPS(AccessUnit& accessUnit, TComSPS* sps);
+  Void xWritePPS(AccessUnit& accessUnit, TComPPS* pps);
+  Void xWriteBitstream(std::ostream& out, AccessUnit &accessUnit, InputNALUnit& inNal, NalStream* nalStream, Int& tileId);
   // TODO:
   // WriteSEI
   Void xWriteSEI(std::ostream&out, OutputNALUnit);
