@@ -23,12 +23,12 @@
 class NalStream
 {
 private:
-  std::ifstream mStream;
-  TDecEntropy mEntropyDecoder;
-  TDecCavlc mCavlcDecoder;
+  std::ifstream       mStream;
+  TDecEntropy         mEntropyDecoder;
+  TDecCavlc           mCavlcDecoder;
   ParameterSetManager mParameterSetManager;
-  AnnexBStats mStats;
-  InputByteStream* mByteStream;
+  AnnexBStats         mStats;
+  InputByteStream*    mByteStream;
   //InputNALUnit mNalu;
 
   Int mExtSPSId;

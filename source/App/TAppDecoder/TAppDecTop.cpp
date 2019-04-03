@@ -187,11 +187,14 @@ Void TAppDecTop::merge()
     for (Int iTile = 0; iTile < numTiles; iTile++)
     {
       // Tile 정보 mixing
+      // 어드레스 주소랑
+      // 크기
     }
 
     //---------FRAME 단위로 SLICE 쓰기---------------------------
     // FIXME:
     // GOP 단위로 고쳐야됨
+    // // VPS, SPS, PPS 들어오면
     for (Int iFrame = 0; iFrame < /*max frame*/32; iFrame++)
     {
       AccessUnit accessUnit;
@@ -203,11 +206,20 @@ Void TAppDecTop::merge()
 
         // FIXME:
         // SEI Message면 다시 읽기
-        while (!(nalu.m_nalUnitType == NAL_UNIT_PREFIX_SEI))
+        while (nalu.m_nalUnitType == NAL_UNIT_PREFIX_SEI)
         {
+          vector<uint8_t> outputBuffer;
+          std::size_t outputAmount = 0;
+          outputAmount = addEmulationPreventionByte(outputBuffer, nalu.getBitstream().getFifo);
+          mergedFile.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
+          mergedFile.write(reinterpret_cast<const TChar*>(&(*outputBuffer.begin())), outputAmount);
+
           nalu = InputNALUnit();
           m_pNal[iTile].getSliceNAL(nalu);
         }
+
+        m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
+        m_cEntropyDecoder.setBitstream(&);
 
         xWriteBitstream(mergedFile, accessUnit, nalu, &m_pNal[iTile], iTile);
       } // end of iTile
@@ -221,27 +233,6 @@ Void TAppDecTop::merge()
 // ====================================================================================================================
 // Protected member functions
 // ====================================================================================================================
-
-
-Void TAppDecTop::replaceParameter(fstream& out, SEIMCTSExtractionInfoSets& sei, Int mctsEisIdTarget, Int mctsSetIdxTarget, ParameterSetManager& parameterSetmanager)
-{
-  // getNumberOf~ Parametersets for application
-	for (Int j = 0; j < sei.infoSetData(mctsEisIdTarget).getNumberOfVPSInInfoSets(); j++)
-	{
-		out.write(reinterpret_cast<const TChar*>(start_code_prefix), 4);
-		vector<uint8_t>& vpsRBSPBuf = sei.infoSetData(mctsEisIdTarget).vpsInInfoSetData(j).getRBSP();
-		writeParameter(out, NAL_UNIT_VPS, 0, 0, vpsRBSPBuf, parameterSetmanager);
-	}
-  out.write(reinterpret_cast<const TChar*>(start_code_prefix), 4);
-  vector<uint8_t>& spsRBSPBuf = sei.infoSetData(mctsEisIdTarget).spsInInfoSetData(mctsSetIdxTarget).getRBSP();
-  writeParameter(out, NAL_UNIT_SPS, 0, 0, spsRBSPBuf, parameterSetmanager);
-	for (Int j = 0; j < sei.infoSetData(mctsEisIdTarget).getNumberOfPPSInInfoSets(); j++)
-	{
-		out.write(reinterpret_cast<const TChar*>(start_code_prefix), 4);
-		vector<uint8_t>& ppsRBSPBuf = sei.infoSetData(mctsEisIdTarget).ppsInInfoSetData(j).getRBSP();
-		writeParameter(out, NAL_UNIT_PPS, 0, sei.infoSetData(mctsEisIdTarget).ppsInInfoSetData(j).m_nuh_temporal_id, ppsRBSPBuf, parameterSetmanager);
-	}
-}
 
 Void TAppDecTop::xWriteVPSSPSPPS(std::ostream& out, TComVPS* vps, TComSPS* sps, TComPPS* pps)
 {
@@ -302,6 +293,12 @@ Void TAppDecTop::xWriteBitstream(
   slice.setTLayerInfo(inNal.m_temporalId);
   slice.setNumMCTSTile(numTiles);
   slice.setCountTile(tileId++);
+  slice.setLFCrossSliceBoundaryFlag(false);
+  
+  if (tileId == 0)
+  {
+    slice.setSliceSegmentCurStartCtuTsAddr
+  }
   m_cEntropyDecoder.decodeSliceHeader(&slice, &m_oriParameterSetManager, &m_parameterSetManager, 0);
 
 #ifndef DM_TEST
@@ -315,6 +312,14 @@ Void TAppDecTop::xWriteBitstream(
   if (tileId == numTiles)
   {
     tileId = 0;
+
+    TComSlice asdfasfd
+    OutputNALUnit nalu(NAL_UNIT_CODED);
+
+    TComOutputBitstream bsSliceHeader;
+    m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
+    m_cEntropyCoder.setBitstream(&bsSliceHeader);
+    m_cEntropyCoder.encodeSliceHeader(&slice);
 
     const vector<UInt>& statsTop = writeAnnexB(out, accessUnit);
   }
@@ -353,6 +358,7 @@ Void TAppDecTop::xWriteBitstream(
   vector<uint8_t> outputSliceHeaderBuffer;
   std::size_t outputSliceHeaderAmount = 0;
   outputSliceHeaderAmount = addEmulationPreventionByte(outputSliceHeaderBuffer, bsSliceHeader.getFIFO());
+  
   out.write(reinterpret_cast<const TChar*>(&(*outputSliceHeaderBuffer.begin())), outputSliceHeaderAmount);
 
   TComInputBitstream** ppcSubstreams = NULL;
@@ -412,6 +418,7 @@ std::size_t TAppDecTop::addEmulationPreventionByte(vector<uint8_t>& outputBuffer
 
 	return outputAmount;
 }
+
 Void TAppDecTop::writeParameter(fstream& out, NalUnitType nalUnitType, UInt nuhLayerId, UInt temporalId, vector<uint8_t>& rbsp, ParameterSetManager& parameterSetmanager)
 {
 	
