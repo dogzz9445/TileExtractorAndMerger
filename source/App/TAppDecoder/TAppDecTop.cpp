@@ -138,7 +138,23 @@ Void TAppDecTop::decode()
     m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
     m_cEntropyDecoder.setBitstream(&(nalu.getBitstream()));
 
-    m_cEntropyDecoder.decodeSliceHeader();
+    TComSlice slice;
+    slice.initSlice();
+    slice.setNalUnitType(nalu.m_nalUnitType);
+    Bool nonReferenceFlag = (
+      slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_TRAIL_N ||
+      slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_TSA_N ||
+      slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_STSA_N ||
+      slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_RADL_N ||
+      slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N
+      );
+    slice.setTemporalLayerNonReferenceFlag(nonReferenceFlag);
+    slice.setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
+    slice.setTLayerInfo(nalu.m_temporalId);
+    slice.setNumMCTSTile(0);
+    slice.setCountTile(0);
+
+    m_cEntropyDecoder.decodeSliceHeader(&slice, &m_oriParameterSetManager, &m_parameterSetManager, 0);
 
     inBit = nalu.getBitstream();
     bitsLeft = inBit.getNumBitsLeft();
