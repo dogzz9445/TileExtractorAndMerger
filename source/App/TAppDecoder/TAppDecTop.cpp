@@ -133,6 +133,7 @@ Void TAppDecTop::decode()
   {
     std::cout << i << ":\n";
     pNal[0].readNALUnit(nalu);
+    m_oriParameterSetManager = pNal[0].getParameterSetManager();
 
     m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
     m_cEntropyDecoder.setBitstream(&(nalu.getBitstream()));
