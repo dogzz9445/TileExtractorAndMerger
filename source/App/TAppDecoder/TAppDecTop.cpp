@@ -128,21 +128,30 @@ Void TAppDecTop::decode()
   UInt bitsUntilByteAligned = 0;
   UInt bitsRead = 0;
 
+
   for (int i = 0; i < 37; i++)
   {
     std::cout << i << ":\n";
     pNal[0].readNALUnit(nalu);
+
+    m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
+    m_cEntropyDecoder.setBitstream(&(nalu.getBitstream()));
+
+    m_cEntropyDecoder.decodeSliceHeader();
 
     inBit = nalu.getBitstream();
     bitsLeft = inBit.getNumBitsLeft();
     bitsUntilByteAligned = inBit.getNumBitsUntilByteAligned();
     bitsRead = inBit.getNumBitsRead();
     byteLocation = inBit.getByteLocation();
+    
+    std::vector<uint8_t> fifo = inBit.getFifo();
 
     std::cout << "BitsLeft: " << bitsLeft <<
       "\nBitsUntilByteAligned: " << bitsUntilByteAligned <<
       "\nBitsRead: " << bitsRead <<
-      "\nByteLocation: " << byteLocation << std::endl;
+      "\nByteLocation: " << byteLocation <<
+      "\nfifo size: " << fifo.size() << std::endl;
   }
 
   if (pNal)
