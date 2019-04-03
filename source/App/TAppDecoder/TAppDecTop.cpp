@@ -42,12 +42,9 @@
 #include <assert.h>
 
 #include "TAppDecTop.h"
-#include "TLibDecoder/AnnexBread.h"
-#include "TLibDecoder/NALread.h"
 
 //! \ingroup TAppDecoder
 //! \{
-
 
 static const UChar emulation_prevention_three_byte[] = { 3 };
 static const UChar start_code_prefix[] = { 0, 0, 0, 1 };
@@ -59,10 +56,9 @@ static const UChar start_code_prefix[] = { 0, 0, 0, 1 };
 TAppDecTop::TAppDecTop()
 : m_seiReader()
  ,m_pSEIOutputStream(NULL)
- ,m_cCavlcDecoder() 
  ,m_cCavlcCoder()
- ,m_cEntropyDecoder()
  ,m_cEntropyCoder()
+ ,m_cEntropyDecoder()
  ,m_parameterSetManager()
  ,m_oriParameterSetManager()
  ,m_manageSliceAddress()
@@ -109,6 +105,7 @@ Void TAppDecTop::merge()
 //---------TEST PARAMETER-------------------------------
   // TEST PAPRAMETER
   Int numTiles = m_numberOfTiles;
+  Int countTile = 0;
 
   // TEST FILE NAME
   std::vector<std::string> fileNames;
@@ -122,7 +119,8 @@ Void TAppDecTop::merge()
     m_pNal[i].addFile(fileNames.at(i).c_str());
   }
 
-  xInitDecLib();
+  xInitDecLib(); 
+  xInitLogSEI();
 
   // Output Stream
   fstream mergedFile(m_outBitstreamFileName, fstream::binary | fstream::out);
@@ -154,16 +152,24 @@ Void TAppDecTop::merge()
       // FIXME:
       // first VPS, SPS, PPS ÆÄ½ÌÇØ¿À´Â°Ô ¾Æ´Ï°Ô °íÃÄ¾ßµÊ
       // VPS, SPS, PPS Á¤º¸ ¹Í½Ì
-      InputNALUnit nalu_vps;
-      TComVPS* vps = m_pNal[0].getVPS(nalu_vps);
-      InputNALUnit nalu_sps;
-      TComSPS* sps = m_pNal[0].getSPS(nalu_sps);
-      InputNALUnit nalu_pps;
-      TComPPS* pps = m_pNal[0].getPPS(nalu_pps);
+      InputNALUnit nalu_ivps;
+      TComVPS* iVps = m_pNal[0].getVPS(nalu_ivps);
+      InputNALUnit nalu_isps;
+      TComSPS* iSps = m_pNal[0].getSPS(nalu_isps);
+      InputNALUnit nalu_ipps;
+      TComPPS* iPps = m_pNal[0].getPPS(nalu_ipps);
+      
+      // ¹Í½Ì ¶óÀÎ
+      TComVPS* oVps;
+      TComSPS* oSps;
+      TComPPS* oPps;
+
+      oVps = iVps;
+
 
       // FIXME:
       // VPS, SPS, PPS ¼öÁ¤ÇØ¼­ ¾²±â
-      writeVPSSPSPPS(mergedFile, vps, sps, pps);
+      xWriteVPSSPSPPS(mergedFile, oVps, oSps, oPps);
     }
 
     for (Int iTile = 0; iTile < numTiles; iTile++)
@@ -176,6 +182,7 @@ Void TAppDecTop::merge()
     // GOP ´ÜÀ§·Î °íÃÄ¾ßµÊ
     for (Int iFrame = 0; iFrame < /*max frame*/32; iFrame++)
     {
+      AccessUnit accessUnit;
       for (Int iTile = 0; iTile < numTiles; iTile++)
       {
         //if (m_mctsTidTarget < nalu.m_temporalId)
@@ -188,6 +195,10 @@ Void TAppDecTop::merge()
         {
           m_pNal[iTile].getSliceNAL(nalu);
         }
+        TComInputBitstream
+        nalu.getBitstream();
+
+        m_oriParameterSetManager = m_pNal[iTile].getParameterSetManager();
 
         TComSlice slice;
         slice.initSlice();
@@ -202,10 +213,19 @@ Void TAppDecTop::merge()
         slice.setTemporalLayerNonReferenceFlag(nonReferenceFlag);
         slice.setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
         slice.setTLayerInfo(nalu.m_temporalId);
-        slice.setNumMCTSTile(sei->infoSetData(m_mctsEisIdTarget).mctsSetData(m_mctsSetIdxTarget).getNumberOfMCTSIdxs());
+        slice.setNumMCTSTile(numTiles);
         slice.setCountTile(countTile++);
-      }
-    }
+        m_cEntropyDecoder.decodeSliceHeader(&slice, &m_oriParameterSetManager, &m_parameterSetManager, 0);
+        
+        OutputNALUnit oNalu( slice.getNalUnitType(), slice.getTLayer() );
+
+        m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
+        m_cEntropyCoder.encodeSliceHeader(&slice);
+
+        accessUnit.push_back(new NALUnitEBSP(oNalu));
+      } // end of iTile
+      xWriteBitstream(mergedFile, accessUnit);
+    } // end of iFrame
   } // end of (while (mergedFile.is_open()))
 
 
@@ -345,6 +365,41 @@ Void TAppDecTop::replaceParameter(fstream& out, SEIMCTSExtractionInfoSets& sei, 
 	}
 }
 
+Void TAppDecTop::xWriteVPSSPSPPS(std::ostream& out, TComVPS* vps, TComSPS* sps, TComPPS* pps)
+{
+  AccessUnit accessUnit;
+  xWriteVPS(accessUnit, vps);
+  xWriteSPS(accessUnit, sps);
+  xWritePPS(accessUnit, pps);
+
+  const vector<UInt>& statsTop = writeAnnexB(out, accessUnit);
+}
+
+Void TAppDecTop::xWriteVPS(AccessUnit &accessUnit, TComVPS* vps)
+{
+  OutputNALUnit nalu(NAL_UNIT_VPS);
+  m_cEntropyCoder.setBitstream(&nalu.m_Bitstream);
+  m_cEntropyCoder.encodeVPS(vps);
+  accessUnit.push_back(new NALUnitEBSP(nalu));
+}
+
+Void TAppDecTop::xWriteSPS(AccessUnit &accessUnit, TComSPS* sps)
+{
+  OutputNALUnit nalu(NAL_UNIT_SPS);
+  m_cEntropyCoder.setBitstream(&nalu.m_Bitstream);
+  m_cEntropyCoder.encodeSPS(sps);
+  accessUnit.push_back(new NALUnitEBSP(nalu));
+}
+
+Void TAppDecTop::xWritePPS(AccessUnit &accessUnit, TComPPS* pps)
+{
+  OutputNALUnit nalu(NAL_UNIT_PPS);
+  m_cEntropyCoder.setBitstream(&nalu.m_Bitstream);
+  m_cEntropyCoder.encodePPS(pps);
+  accessUnit.push_back(new NALUnitEBSP(nalu));
+}
+
+
 std::size_t TAppDecTop::addEmulationPreventionByte(vector<uint8_t>& outputBuffer, vector<uint8_t>& rbsp)
 {
 	outputBuffer.resize(rbsp.size() * 2 + 1); //there can never be enough emulation_prevention_three_bytes to require this much space
@@ -387,9 +442,9 @@ Void TAppDecTop::writeParameter(fstream& out, NalUnitType nalUnitType, UInt nuhL
 	
 	TComOutputBitstream bsNALUHeader;
 
-	bsNALUHeader.write(0, 1);                    // forbidden_zero_bit
-	bsNALUHeader.write(nalUnitType, 6);  // nal_unit_type
-	bsNALUHeader.write(nuhLayerId, 6);   // nuh_layer_id
+	bsNALUHeader.write(0, 1);              // forbidden_zero_bit
+	bsNALUHeader.write(nalUnitType, 6);    // nal_unit_type
+	bsNALUHeader.write(nuhLayerId, 6);     // nuh_layer_id
 	bsNALUHeader.write(temporalId + 1, 3); // nuh_temporal_id_plus1
 
 	out.write(reinterpret_cast<const TChar*>(bsNALUHeader.getByteStream()), bsNALUHeader.getByteStreamLength());
@@ -500,9 +555,13 @@ Void TAppDecTop::writeSlice(fstream& out, InputNALUnit& nalu, TComSlice* pcSlice
 	out.write(reinterpret_cast<const TChar*>(&(*outputSliceRbspBuffer.begin())), outputRbspHeaderAmount);
 
 }
+
 Void TAppDecTop::xInitDecLib()
 {
+}
 
+Void TAppDecTop::xInitLogSEI()
+{
   if (!m_outputDecodedSEIMessagesFilename.empty())
   {
     std::ostream &os=m_seiMessageFileStream.is_open() ? m_seiMessageFileStream : std::cout;

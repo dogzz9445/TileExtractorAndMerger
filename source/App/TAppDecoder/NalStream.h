@@ -31,6 +31,9 @@ private:
   InputByteStream* mByteStream;
   //InputNALUnit mNalu;
 
+  Int mExtSPSId;
+  Int mExtPPSId;
+
 public:
   NalStream();
   NalStream(const char* filename);

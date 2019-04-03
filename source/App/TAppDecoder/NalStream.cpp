@@ -70,6 +70,8 @@ Void NalStream::readNALUnit(InputNALUnit& nalu)
     mEntropyDecoder.decodeSPS(sps);
 
     mParameterSetManager.storeSPS(sps, nalu.getBitstream().getFifo());
+
+    mExtSPSId = sps->getSPSId();
   }
   break;
   case NAL_UNIT_PPS:
@@ -78,11 +80,13 @@ Void NalStream::readNALUnit(InputNALUnit& nalu)
     mEntropyDecoder.decodePPS(pps); 
 
     mParameterSetManager.storePPS(pps, nalu.getBitstream().getFifo());
+
+    mExtPPSId = pps->getPPSId();
   }
   break;
   case NAL_UNIT_PREFIX_SEI:
   {
-    // FIXME:
+    // TODO:
     /*if (m_seiReader.parseSEImessage(*sei, &(nalu.getBitstream()), m_pSEIOutputStream, bitsSliceSegmentAddress))
     {
       replaceParameter(extractFile, *sei, m_mctsEisIdTarget, m_mctsSetIdxTarget, m_parameterSetManager);

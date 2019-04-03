@@ -55,6 +55,14 @@
 #include "TLibDecoder/TDecCAVLC.h"
 #include "TLibDecoder/SliceAddressTsRsOrder.h"
 
+// For read
+#include "TLibDecoder/AnnexBread.h"
+#include "TLibDecoder/NALread.h"
+
+// For write
+#include "TLibEncoder/AnnexBwrite.h"
+#include "TLibEncoder/NALwrite.h"
+
 #include "NalStream.h"
 
 //! \ingroup TAppDecoder
@@ -72,9 +80,8 @@ private:
 	//editJW
 	SEIReader												m_seiReader;
 	std::ostream									 *m_pSEIOutputStream;
-	TDecEntropy											m_cEntropyDecoder;
-	TEncEntropy											m_cEntropyCoder;
-	TDecCavlc												m_cCavlcDecoder;
+  TEncEntropy											m_cEntropyCoder;
+  TDecEntropy											m_cEntropyDecoder;
 	TEncCavlc												m_cCavlcCoder;
 	ParameterSetManager							m_oriParameterSetManager;
 	ParameterSetManager							m_parameterSetManager;
@@ -85,7 +92,8 @@ private:
 	
   std::ofstream                   m_seiMessageFileStream;         ///< Used for outputing SEI messages.
 
-  NalStream * m_pNal;
+  NalStream *m_pNal;
+  list<AccessUnit> mOutputAccessUnits;
 
 public:
   TAppDecTop();
@@ -100,7 +108,7 @@ public:
 
 protected:
   Void  xInitDecLib       (); ///< initialize decoder class
-
+  Void  xInitLogSEI       ();
 
 private:
 	//edit JW
@@ -110,7 +118,14 @@ private:
 	Void writeSlice(fstream& out, InputNALUnit& nalu, TComSlice* pcSlice);
 
   //edit DM
-  Void writeVPSSPSPPS(fstream& out, TComVPS* vps, TComSPS* sps, TComPPS* pps);
+  Void xWriteVPSSPSPPS(std::ostream& out, TComVPS* vps, TComSPS* sps, TComPPS* pps);
+  Void xWriteVPS(AccessUnit &accessUnit, TComVPS* vps);
+  Void xWriteSPS(AccessUnit &accessUnit, TComSPS* sps);
+  Void xWritePPS(AccessUnit &accessUnit, TComPPS* pps);
+  Void xWriteBitstream(std::ostream& out, AccessUnit &accessUnit/*, TComSlice* slice*/);
+  // TODO:
+  // WriteSEI
+  Void xWriteSEI(std::ostream&out, OutputNALUnit);
 };
 
 //! \}
