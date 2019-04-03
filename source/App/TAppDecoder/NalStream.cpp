@@ -41,9 +41,9 @@ Void NalStream::addFile(const char* filename)
   mByteStream = new InputByteStream(mStream);
 }
 
-Void NalStream::readNALUnit()
+Void NalStream::readNALUnit(InputNALUnit& nalu)
 {
-  InputNALUnit nalu;
+  nalu = InputNALUnit();
   byteStreamNALUnit(*mByteStream, nalu.getBitstream().getFifo(), mStats);
 
   read(nalu);
@@ -53,6 +53,8 @@ Void NalStream::readNALUnit()
   }
   mEntropyDecoder.setEntropyDecoder(&mCavlcDecoder);
   mEntropyDecoder.setBitstream(&(nalu.getBitstream()));
+
+  TComInputBitstream inBit = nalu.getBitstream();
 
   std::cout << "NalType: " << nalUnitTypeToString(nalu.m_nalUnitType) << std::endl;
 

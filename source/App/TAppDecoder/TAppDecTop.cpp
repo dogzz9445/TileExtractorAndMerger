@@ -121,16 +121,29 @@ Void TAppDecTop::decode()
 	//Int					bitsSliceSegmentAddress = 0;
 	//SEIMCTSExtractionInfoSets *sei			= new SEIMCTSExtractionInfoSets;
 
-  std::cout << "1:\n";
-  pNal[0].readNALUnit();
-  std::cout << "2:\n";
-  pNal[0].readNALUnit();
-  std::cout << "3:\n";
-  pNal[0].readNALUnit();
-  std::cout << "4:\n";
-  pNal[0].readNALUnit();
-  std::cout << "5:\n";
-  pNal[0].readNALUnit();
+  InputNALUnit nalu;
+  TComInputBitstream inBit;
+  UInt byteLocation = 0;
+  UInt bitsLeft = 0;
+  UInt bitsUntilByteAligned = 0;
+  UInt bitsRead = 0;
+
+  for (int i = 0; i < 37; i++)
+  {
+    std::cout << i << ":\n";
+    pNal[0].readNALUnit(nalu);
+
+    inBit = nalu.getBitstream();
+    bitsLeft = inBit.getNumBitsLeft();
+    bitsUntilByteAligned = inBit.getNumBitsUntilByteAligned();
+    bitsRead = inBit.getNumBitsRead();
+    byteLocation = inBit.getByteLocation();
+
+    std::cout << "BitsLeft: " << bitsLeft <<
+      "\nBitsUntilByteAligned: " << bitsUntilByteAligned <<
+      "\nBitsRead: " << bitsRead <<
+      "\nByteLocation: " << byteLocation << std::endl;
+  }
 
   if (pNal)
   {

@@ -42,7 +42,7 @@ public:
     }
   }
 
-  Void readNALUnit();
+  Void readNALUnit(InputNALUnit& nalu);
   Void addFile(const char* filename);
 
   ParameterSetManager getParameterSetManager()                        { return mParameterSetManager; }
