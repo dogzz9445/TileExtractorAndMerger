@@ -23,15 +23,10 @@ NalStream::NalStream(const char* filename)
 
 Void NalStream::addFile(const char* filename)
 {
-  if (mStream.is_open())
-  {
-    mStream.close();
-    mStream.clear();
-  }
-
+  std::cout << filename << std::endl;
   mStream.open(filename, std::ifstream::in | std::ifstream::binary);
 
-  if (!mStream.is_open)
+  if (!mStream.is_open())
   {
     std::cerr << "Warning: File is not opened\n";
     exit(EXIT_FAILURE);
@@ -51,9 +46,12 @@ Void NalStream::readNALUnit(InputNALUnit& nalu)
   {
     std::cerr << "Waring: Attempt to decode an empty NAL unit\n";
   }
+
+  std::cerr << "Entropy Decoding...\n";
+
   mEntropyDecoder.setEntropyDecoder(&mCavlcDecoder);
   mEntropyDecoder.setBitstream(&(nalu.getBitstream()));
-  
+    
   std::cout << nalUnitTypeToString(nalu.m_nalUnitType) << std::endl;
   switch (nalu.m_nalUnitType)
   {
@@ -64,6 +62,7 @@ Void NalStream::readNALUnit(InputNALUnit& nalu)
 
     mParameterSetManager.storeVPS(vps, nalu.getBitstream().getFifo());
   }
+  break;
   case NAL_UNIT_SPS:
   {
     TComSPS*		sps = new TComSPS();
@@ -82,7 +81,7 @@ Void NalStream::readNALUnit(InputNALUnit& nalu)
     mParameterSetManager.storePPS(pps, nalu.getBitstream().getFifo());
 
     mExtPPSId = pps->getPPSId();
-  }
+  }  
   break;
   case NAL_UNIT_PREFIX_SEI:
   {

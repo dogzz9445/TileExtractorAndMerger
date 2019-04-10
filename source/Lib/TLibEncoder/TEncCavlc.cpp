@@ -640,7 +640,7 @@ Void TEncCavlc::codeSPS( const TComSPS* pcSPS )
   WRITE_UVLC(rpsList->getNumberOfReferencePictureSets(), "num_short_term_ref_pic_sets" );
   for(Int i=0; i < rpsList->getNumberOfReferencePictureSets(); i++)
   {
-    const TComReferencePictureSet*rps = rpsList->getReferencePictureSet(i);
+    const TComReferencePictureSet* rps = rpsList->getReferencePictureSet(i);
     codeShortTermRefPicSet( rps,false, i);
   }
   WRITE_FLAG( pcSPS->getLongTermRefsPresent() ? 1 : 0,         "long_term_ref_pics_present_flag" );

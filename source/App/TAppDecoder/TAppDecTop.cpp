@@ -115,23 +115,29 @@ Void TAppDecTop::merge()
 #endif
   // TEST FILE NAME
   std::vector<std::string> fileNames;
-  fileNames.resize(numTiles);
+  //fileNames.resize(numTiles);
 #ifdef DM_TEST
   fileNames.push_back(std::string("1.bin"));
   fileNames.push_back(std::string("2.bin"));
   fileNames.push_back(std::string("4.bin"));
   fileNames.push_back(std::string("5.bin"));
+
+  Int EntireWidth = 512;
+  Int EntireHeight = 320;
 #endif
 //---------FILE IN/OUT STREAM---------------------------
   // Input Stream
   m_pNal = new NalStream[numTiles];
   for (int i = 0; i < numTiles; i++)
   {
-    m_pNal[i].addFile(fileNames.at(i).c_str());
+    m_pNal[i].addFile(fileNames[i].c_str());
   }
 
   xInitDecLib(); 
   xInitLogSEI();
+
+  m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
+  m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
 
   // Output Stream
   fstream mergedFile(m_outBitstreamFileName, fstream::binary | fstream::out);
@@ -153,44 +159,80 @@ Void TAppDecTop::merge()
         InputNALUnit nalu;
         m_pNal[iTile].readNALUnit(nalu);
 #ifdef DM_TEST
-        std::cout << "--READ VPSSPSPPS--\NFILE: iTile: " << iTile <<
-          "NalType: " << nalu.m_nalUnitType << std::endl;
+        std::cout << "--READ VPSSPSPPS--\nFILE, iTile: " << iTile <<
+          " NalType: " << nalUnitTypeToString(nalu.m_nalUnitType) << std::endl;
 #endif
       }
     }
 
+    std::cout << "Writing VPS SPS PPS...\n";
     // VPS, SPS, PPS 정보 믹싱, 쓰기
-    {
-      // FIXME:
-      // first VPS, SPS, PPS 파싱해오는게 아니게 고쳐야됨
-      // VPS, SPS, PPS 정보 믹싱
-      InputNALUnit nalu_ivps;
-      TComVPS* iVps = m_pNal[0].getVPS(nalu_ivps);
-      InputNALUnit nalu_isps;
-      TComSPS* iSps = m_pNal[0].getSPS(nalu_isps);
-      InputNALUnit nalu_ipps;
-      TComPPS* iPps = m_pNal[0].getPPS(nalu_ipps);
+    // FIXME:
+    // first VPS, SPS, PPS 파싱해오는게 아니게 고쳐야됨
+    // VPS, SPS, PPS 정보 믹싱
+    InputNALUnit nalu_ivps;
+    TComVPS* inVps = m_pNal[0].getVPS(nalu_ivps);
+    InputNALUnit nalu_isps;
+    TComSPS* inSps = m_pNal[0].getSPS(nalu_isps);
+    InputNALUnit nalu_ipps;
+    TComPPS* inPps = m_pNal[0].getPPS(nalu_ipps);
       
-      // 믹싱 라인
-      TComVPS* oVps;
-      TComSPS* oSps;
-      TComPPS* oPps;
+    // 믹싱 라인
+    TComVPS* outVps;
+    TComSPS* outSps;
+    TComPPS* outPps;
 
-      oVps = iVps;
+    outVps = inVps;
+    outSps = inSps;
+    outPps = inPps;
+      
+    outSps->setPicWidthInLumaSamples(EntireWidth);
+    outSps->setPicHeightInLumaSamples(EntireHeight);
 
+    std::vector<Int> tileWidths;
+    tileWidths.push_back(256);
+    tileWidths.push_back(256);
 
-      // FIXME:
-      // VPS, SPS, PPS 수정해서 쓰기
-      xWriteVPSSPSPPS(mergedFile, oVps, oSps, oPps);
-    }
+    std::vector<Int> tileHeigths;
+    tileHeigths.push_back(128);
+    tileHeigths.push_back(192);
 
-    for (Int iTile = 0; iTile < numTiles; iTile++)
-    {
-      // Tile 정보 mixing
-      // 어드레스 주소랑
-      // 크기
-    }
+    outPps->setTilesEnabledFlag(true);
+    outPps->setTileUniformSpacingFlag(true);
+    outPps->setTileColumnWidth(tileWidths);
+    outPps->setTileRowHeight(tileHeigths);
 
+    // FIXME:
+    // VPS, SPS, PPS 수정해서 쓰기
+    std::cout << "Writing VPS SPS PPS...\n";
+    xWriteVPSSPSPPS(mergedFile, outVps, outSps, outPps);
+
+    std::cout << "Writing tile address...\n";
+    //std::vector<Int> tileAddresses;
+    //for (Int iTile = 0; iTile < numTiles; iTile++)
+    //{
+    //  // Tile 정보 mixing
+    //  // 어드레스 주소랑
+    //  // 크기
+    //  if (iTile = 0)
+    //  {
+    //    tileAddresses.push_back(0);
+    //  }
+    //  else if (iTile = 1)
+    //  {
+    //    tileAddresses.push_back(4);
+    //  }
+    //  else if (iTile = 2)
+    //  {
+    //    tileAddresses.push_back(32);
+    //  }
+    //  else if (iTile = 3)
+    //  {
+    //    tileAddresses.push_back(36);
+    //  }
+    //}
+
+    std::cout << "Writing slice...\n";
     //---------FRAME 단위로 SLICE 쓰기---------------------------
     // FIXME:
     // GOP 단위로 고쳐야됨
@@ -210,16 +252,13 @@ Void TAppDecTop::merge()
         {
           vector<uint8_t> outputBuffer;
           std::size_t outputAmount = 0;
-          outputAmount = addEmulationPreventionByte(outputBuffer, nalu.getBitstream().getFifo);
+          outputAmount = addEmulationPreventionByte(outputBuffer, nalu.getBitstream().getFifo());
           mergedFile.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
           mergedFile.write(reinterpret_cast<const TChar*>(&(*outputBuffer.begin())), outputAmount);
 
           nalu = InputNALUnit();
           m_pNal[iTile].getSliceNAL(nalu);
         }
-
-        m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
-        m_cEntropyDecoder.setBitstream(&);
 
         xWriteBitstream(mergedFile, accessUnit, nalu, &m_pNal[iTile], iTile);
       } // end of iTile
@@ -234,7 +273,7 @@ Void TAppDecTop::merge()
 // Protected member functions
 // ====================================================================================================================
 
-Void TAppDecTop::xWriteVPSSPSPPS(std::ostream& out, TComVPS* vps, TComSPS* sps, TComPPS* pps)
+Void TAppDecTop::xWriteVPSSPSPPS(std::ostream& out, const TComVPS* vps, const TComSPS* sps, const TComPPS* pps)
 {
   AccessUnit accessUnit;
   xWriteVPS(accessUnit, vps);
@@ -244,28 +283,28 @@ Void TAppDecTop::xWriteVPSSPSPPS(std::ostream& out, TComVPS* vps, TComSPS* sps, 
   const vector<UInt>& statsTop = writeAnnexB(out, accessUnit);
 }
 
-Void TAppDecTop::xWriteVPS(AccessUnit &accessUnit, TComVPS* vps)
+Void TAppDecTop::xWriteVPS(AccessUnit &accessUnit, const TComVPS* vps)
 {
-  OutputNALUnit nalu(NAL_UNIT_VPS);
-  m_cEntropyCoder.setBitstream(&nalu.m_Bitstream);
+  OutputNALUnit nalu_VPS(NAL_UNIT_VPS);
+  m_cEntropyCoder.setBitstream(&(nalu_VPS.m_Bitstream));
   m_cEntropyCoder.encodeVPS(vps);
-  accessUnit.push_back(new NALUnitEBSP(nalu));
+  accessUnit.push_back(new NALUnitEBSP(nalu_VPS));
 }
 
-Void TAppDecTop::xWriteSPS(AccessUnit &accessUnit, TComSPS* sps)
+Void TAppDecTop::xWriteSPS(AccessUnit &accessUnit, const TComSPS* sps)
 {
-  OutputNALUnit nalu(NAL_UNIT_SPS);
-  m_cEntropyCoder.setBitstream(&nalu.m_Bitstream);
+  OutputNALUnit nalu_SPS(NAL_UNIT_SPS);
+  m_cEntropyCoder.setBitstream(&(nalu_SPS.m_Bitstream));
   m_cEntropyCoder.encodeSPS(sps);
-  accessUnit.push_back(new NALUnitEBSP(nalu));
+  accessUnit.push_back(new NALUnitEBSP(nalu_SPS));
 }
 
-Void TAppDecTop::xWritePPS(AccessUnit &accessUnit, TComPPS* pps)
+Void TAppDecTop::xWritePPS(AccessUnit &accessUnit, const TComPPS* pps)
 {
-  OutputNALUnit nalu(NAL_UNIT_PPS);
-  m_cEntropyCoder.setBitstream(&nalu.m_Bitstream);
+  OutputNALUnit nalu_PPS(NAL_UNIT_PPS);
+  m_cEntropyCoder.setBitstream(&(nalu_PPS.m_Bitstream));
   m_cEntropyCoder.encodePPS(pps);
-  accessUnit.push_back(new NALUnitEBSP(nalu));
+  accessUnit.push_back(new NALUnitEBSP(nalu_PPS));
 }
 
 Void TAppDecTop::xWriteBitstream(
@@ -292,12 +331,21 @@ Void TAppDecTop::xWriteBitstream(
   slice.setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
   slice.setTLayerInfo(inNal.m_temporalId);
   slice.setNumMCTSTile(numTiles);
-  slice.setCountTile(tileId++);
+  slice.setCountTile(tileId);
   slice.setLFCrossSliceBoundaryFlag(false);
-  
+
   if (tileId == 0)
   {
-    slice.setSliceSegmentCurStartCtuTsAddr
+    slice.setSliceSegmentRsAddress(0);
+  } else if (tileId == 1)
+  {
+    slice.setSliceSegmentRsAddress(4);
+  } else if (tileId == 2)
+  {
+    slice.setSliceSegmentRsAddress(32);
+  } else if (tileId == 3)
+  {
+    slice.setSliceSegmentRsAddress(36);
   }
   m_cEntropyDecoder.decodeSliceHeader(&slice, &m_oriParameterSetManager, &m_parameterSetManager, 0);
 

@@ -119,14 +119,15 @@ private:
 	Void writeSlice(fstream& out, InputNALUnit& nalu, TComSlice* pcSlice);
 
   //edit DM
-  Void xWriteVPSSPSPPS(std::ostream& out, TComVPS* vps, TComSPS* sps, TComPPS* pps);
-  Void xWriteVPS(AccessUnit& accessUnit, TComVPS* vps);
-  Void xWriteSPS(AccessUnit& accessUnit, TComSPS* sps);
-  Void xWritePPS(AccessUnit& accessUnit, TComPPS* pps);
+  Void xWriteVPSSPSPPS(std::ostream& out, const TComVPS* vps, const TComSPS* sps, const TComPPS* pps);
+  Void xWriteVPS(AccessUnit& accessUnit, const TComVPS* vps);
+  Void xWriteSPS(AccessUnit& accessUnit, const TComSPS* sps);
+  Void xWritePPS(AccessUnit& accessUnit, const TComPPS* pps);
   Void xWriteBitstream(std::ostream& out, AccessUnit &accessUnit, InputNALUnit& inNal, NalStream* nalStream, Int& tileId);
   // TODO:
   // WriteSEI
-  Void xWriteSEI(std::ostream&out, OutputNALUnit);
+  // Void xWriteSEI(std::ostream& out, OutputNALUnit)
+
 };
 
 //! \}

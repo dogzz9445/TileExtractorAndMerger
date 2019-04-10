@@ -1,3 +1,5 @@
+#ifndef _SLICE_ADDRESSTSRSORDER_H_
+#define _SLICE_ADDRESSTSRSORDER_H_
 
 #include "TLibCommon/TComSlice.h"
 
@@ -78,3 +80,5 @@ protected:
 	UInt               xCalculateNextCtuRSAddr(UInt uiCurrCtuRSAddr);
 
 };// END CLASS DEFINITION TComPicSym
+
+#endif // _SLICE_ADDRESSTSRSORDER_H_
