@@ -84,7 +84,7 @@ private:
   TDecEntropy											m_cEntropyDecoder;
   TEncCavlc												m_cCavlcCoder;
   TDecCavlc												m_cCavlcDecoder;
-	ParameterSetManager							m_oriParameterSetManager;
+	ParameterSetManager*						m_oriParameterSetManager;
 	ParameterSetManager							m_parameterSetManager;
 	SliceAddressTsRsOrder						m_manageSliceAddress;
 	Int															m_extSPSId;

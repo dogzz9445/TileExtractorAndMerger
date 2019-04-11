@@ -53,8 +53,8 @@ public:
   TComPPS*   getPPS(InputNALUnit& nalu);
   Void       getSliceNAL(InputNALUnit& nalu);
 
-  ParameterSetManager getParameterSetManager()                        { return mParameterSetManager; }
-  void                setParameterSetManager(ParameterSetManager mP)  { mParameterSetManager = mP; }
+  ParameterSetManager*  getParameterSetManager()                        { return &mParameterSetManager; }
+  void                  setParameterSetManager(ParameterSetManager mP)  { mParameterSetManager = mP; }
 
 
 };

@@ -1163,48 +1163,32 @@ Void TEncCavlc::codeSliceHeader(TComSlice* pcSlice)
 #if ENC_DEC_TRACE
   xTraceSliceHeader ();
 #endif
-
   const ChromaFormat format                = pcSlice->getSPS()->getChromaFormatIdc();
   const UInt         numberValidComponents = getNumberValidComponents(format);
   const Bool         chromaEnabled         = isChromaEnabled(format);
 	
+ // //calculate number of bits required for slice address
+	///*
+ // Int maxSliceSegmentAddress = pcSlice->getPic()->getNumberOfCtusInFrame();
+ // Int bitsSliceSegmentAddress = 0;
+ // while(maxSliceSegmentAddress>(1<<bitsSliceSegmentAddress))
+ // {
+ //   bitsSliceSegmentAddress++;
+ // }
+	//*/
+ // pcSlice->get
+	//Int numCTUs = ((pcSlice->getSPS()->getPicWidthInLumaSamples() + pcSlice->getSPS()->getMaxCUWidth() - 1) / pcSlice->getSPS()->getMaxCUWidth())*((pcSlice->getSPS()->getPicHeightInLumaSamples() + pcSlice->getSPS()->getMaxCUHeight() - 1) / pcSlice->getSPS()->getMaxCUHeight());
+	//UInt sliceSegmentAddress = 0;
   //calculate number of bits required for slice address
-	/*
   Int maxSliceSegmentAddress = pcSlice->getPic()->getNumberOfCtusInFrame();
-  Int bitsSliceSegmentAddress = 0;
-  while(maxSliceSegmentAddress>(1<<bitsSliceSegmentAddress))
-  {
-    bitsSliceSegmentAddress++;
-  }
-	*/
-	
-
-
-	
-	Int numCTUs = ((pcSlice->getSPS()->getPicWidthInLumaSamples() + pcSlice->getSPS()->getMaxCUWidth() - 1) / pcSlice->getSPS()->getMaxCUWidth())*((pcSlice->getSPS()->getPicHeightInLumaSamples() + pcSlice->getSPS()->getMaxCUHeight() - 1) / pcSlice->getSPS()->getMaxCUHeight());
-	UInt sliceSegmentAddress = 0;
 	Int bitsSliceSegmentAddress = 0;
-	while (numCTUs>(1 << bitsSliceSegmentAddress))
+  while (maxSliceSegmentAddress>(1 << bitsSliceSegmentAddress))
 	{
 		bitsSliceSegmentAddress++;
 	}
-	const Int ctuTsAddress = (numCTUs / pcSlice->getNumMCTSTile()) * pcSlice->getCountTile();
-	//fprintf(fp_log, "ctuTsAddress = %d \n", ctuTsAddress);
+	//const Int ctuTsAddress = (numCTUs / pcSlice->getNumMCTSTile()) * pcSlice->getCountTile();
+  std::cout << "maxSliceSegmentAdd: " << maxSliceSegmentAddress << std::endl;
 
-	
-	//const Int sliceSegmentRsAddress = pcSlice->getPic()->getPicSym()->getCtuTsToRsAddrMap(ctuTsAddress);
-	//fprintf(fp_log, "sliceSegmentRsAddress = %d \n", sliceSegmentRsAddress);
-	
-
-	/*
-
-
-	
-	fprintf(fp_log, "ctuTsAddress = %d \n", ctuTsAddress);
-  //write slice address
-  const Int sliceSegmentRsAddress = pcSlice->getPic()->getPicSym()->getCtuTsToRsAddrMap(ctuTsAddress);
-	
-	*/
 	const Int sliceSegmentRsAddress = pcSlice->getSliceSegmentRsAddress();//edit JW
   WRITE_FLAG( sliceSegmentRsAddress==0, "first_slice_segment_in_pic_flag" );
   if ( pcSlice->getRapPicFlag() )

@@ -317,13 +317,14 @@ Void TAppDecTop::xWriteBitstream(
   Int&          tileId)
 {
   m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
-
-  Int numTiles = m_numberOfTiles;
-  m_oriParameterSetManager = nalStream->getParameterSetManager();
+  m_cEntropyDecoder.setBitstream(&inNal.getBitstream());
 
   TComSlice slice;
   slice.initSlice();
   slice.setNalUnitType(inNal.m_nalUnitType);
+
+  m_cEntropyDecoder.decodeSliceHeader(&slice, nalStream->getParameterSetManager(), &m_parameterSetManager, 0);
+
   Bool nonReferenceFlag = (
     slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_TRAIL_N ||
     slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_TSA_N ||
@@ -334,49 +335,25 @@ Void TAppDecTop::xWriteBitstream(
   slice.setTemporalLayerNonReferenceFlag(nonReferenceFlag);
   slice.setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
   slice.setTLayerInfo(inNal.m_temporalId);
-  slice.setNumMCTSTile(numTiles);
-  slice.setCountTile(tileId);
   slice.setLFCrossSliceBoundaryFlag(false);
 
   if (tileId == 0)
   {
     slice.setSliceSegmentRsAddress(0);
-  } else if (tileId == 1)
+  }
+  else if (tileId == 1)
   {
     slice.setSliceSegmentRsAddress(4);
-  } else if (tileId == 2)
+  }
+  else if (tileId == 2)
   {
     slice.setSliceSegmentRsAddress(32);
-  } else if (tileId == 3)
+  }
+  else if (tileId == 3)
   {
     slice.setSliceSegmentRsAddress(36);
   }
-  m_cEntropyDecoder.setBitstream(&inNal.getBitstream());
-  m_cEntropyDecoder.decodeSliceHeader(&slice, &m_oriParameterSetManager, &m_parameterSetManager, 0);
 
-#ifndef DM_TEST
-  OutputNALUnit oNalu(slice.getNalUnitType(), slice.getTLayer());
-
-  m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
-  m_cEntropyCoder.encodeSliceHeader(&slice);
-
-  accessUnit.push_back(new NALUnitEBSP(oNalu));
-
-  if (tileId == numTiles)
-  {
-    tileId = 0;
-
-    TComSlice asdfasfd
-    OutputNALUnit nalu(NAL_UNIT_CODED);
-
-    TComOutputBitstream bsSliceHeader;
-    m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
-    m_cEntropyCoder.setBitstream(&bsSliceHeader);
-    m_cEntropyCoder.encodeSliceHeader(&slice);
-
-    const vector<UInt>& statsTop = writeAnnexB(out, accessUnit);
-  }
-#else DM_TEST
   if (slice.getSliceType() == I_SLICE)
   {
     out.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
@@ -430,7 +407,6 @@ Void TAppDecTop::xWriteBitstream(
   std::size_t outputRbspHeaderAmount = 0;
   outputRbspHeaderAmount = addEmulationPreventionByte(outputSliceRbspBuffer, sliceRbspBuf);
   out.write(reinterpret_cast<const TChar*>(&(*outputSliceRbspBuffer.begin())), outputRbspHeaderAmount);
-#endif
 }
 
 

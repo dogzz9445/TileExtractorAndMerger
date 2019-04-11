@@ -1073,8 +1073,6 @@ Void TDecCavlc::parseSliceHeader(
   pcSlice->setSliceSegmentCurStartCtuTsAddr( sliceSegmentAddress );// this is actually a Raster-Scan (RS) address, but we do not have the RS->TS conversion table defined yet.
   pcSlice->setSliceSegmentCurEndCtuTsAddr(numCTUs);                // Set end as the last CTU of the picture.
 
-
-
   if (!pcSlice->getDependentSliceSegmentFlag())
   {
     pcSlice->setSliceCurStartCtuTsAddr(sliceSegmentAddress); // this is actually a Raster-Scan (RS) address, but we do not have the RS->TS conversion table defined yet.
@@ -1629,7 +1627,7 @@ Void TDecCavlc::parseSliceHeader(
 #if RExt__DECODER_DEBUG_BIT_STATISTICS
   TComCodingStatistics::IncrementStatisticEP(STATS__BYTE_ALIGNMENT_BITS,m_pcBitstream->readByteAlignment(),0);
 #else
-  m_pcBitstream->readByteAlignment();
+  //m_pcBitstream->readByteAlignment();
 #endif
 
   pcSlice->clearSubstreamSizes();
