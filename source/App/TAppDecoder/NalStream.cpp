@@ -37,6 +37,8 @@ Void NalStream::addFile(const char* filename)
 
 
 
+
+
 Void NalStream::readNALUnit(InputNALUnit& nalu)
 {
   byteStreamNALUnit(*mByteStream, nalu.getBitstream().getFifo(), mStats);
@@ -141,4 +143,12 @@ TComPPS* NalStream::getPPS(InputNALUnit& nalu)
 Void NalStream::getSliceNAL(InputNALUnit& nalu)
 {
   readNALUnit(nalu);
+  /*if (!mByteStream)
+  {
+    while (nalu.m_nalUnitType == NAL_UNIT_VPS ||
+      nalu.m_nalUnitType == NAL_UNIT_PPS ||
+      nalu.m_nalUnitType == NAL_UNIT_SPS)
+    {
+    }
+  }*/
 }

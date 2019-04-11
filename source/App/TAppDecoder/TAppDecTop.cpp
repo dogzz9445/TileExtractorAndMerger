@@ -149,7 +149,7 @@ Void TAppDecTop::merge()
 
 //---------GOP 단위로 MERGING---------------------------
 //---------VPS, SPS, PPS-------------------------------
-  while (mergedFile.is_open())
+  if (mergedFile.is_open())
   {
     // VPS SPS, PPS 정보 파싱
     for (Int iVPSSPSPPS = 0; iVPSSPSPPS < 3; iVPSSPSPPS++)
@@ -201,6 +201,8 @@ Void TAppDecTop::merge()
     outPps->setTileUniformSpacingFlag(true);
     outPps->setTileColumnWidth(tileWidths);
     outPps->setTileRowHeight(tileHeigths);
+    outPps->setNumTileColumnsMinus1(1);
+    outPps->setNumTileRowsMinus1(1);
 
     // FIXME:
     // VPS, SPS, PPS 수정해서 쓰기
@@ -243,7 +245,7 @@ Void TAppDecTop::merge()
       for (Int iTile = 0; iTile < numTiles; iTile++)
       {
         //if (m_mctsTidTarget < nalu.m_temporalId)
-        InputNALUnit nalu;
+        InputNALUnit nalu = InputNALUnit();
         m_pNal[iTile].getSliceNAL(nalu);
 
         // FIXME:
@@ -314,6 +316,8 @@ Void TAppDecTop::xWriteBitstream(
   NalStream*    nalStream, 
   Int&          tileId)
 {
+  m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
+
   Int numTiles = m_numberOfTiles;
   m_oriParameterSetManager = nalStream->getParameterSetManager();
 
@@ -347,6 +351,7 @@ Void TAppDecTop::xWriteBitstream(
   {
     slice.setSliceSegmentRsAddress(36);
   }
+  m_cEntropyDecoder.setBitstream(&inNal.getBitstream());
   m_cEntropyDecoder.decodeSliceHeader(&slice, &m_oriParameterSetManager, &m_parameterSetManager, 0);
 
 #ifndef DM_TEST

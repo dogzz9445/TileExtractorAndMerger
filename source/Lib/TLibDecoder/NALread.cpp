@@ -179,8 +179,6 @@ Void read(InputNALUnit& nalu)
   // perform anti-emulation prevention
   convertPayloadToRBSP(nalUnitBuf, &bitstream, (nalUnitBuf[0] & 64) == 0);
   bitstream.resetToStart();
-
-	//edit JW
   readNalUnitHeader(nalu);
 }
 //! \}
