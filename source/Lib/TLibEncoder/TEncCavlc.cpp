@@ -1177,19 +1177,24 @@ Void TEncCavlc::codeSliceHeader(TComSlice* pcSlice)
  // }
 	//*/
  // pcSlice->get
-	//Int numCTUs = ((pcSlice->getSPS()->getPicWidthInLumaSamples() + pcSlice->getSPS()->getMaxCUWidth() - 1) / pcSlice->getSPS()->getMaxCUWidth())*((pcSlice->getSPS()->getPicHeightInLumaSamples() + pcSlice->getSPS()->getMaxCUHeight() - 1) / pcSlice->getSPS()->getMaxCUHeight());
+	Int numCTUs = ((pcSlice->getSPS()->getPicWidthInLumaSamples() + pcSlice->getSPS()->getMaxCUWidth() - 1) / 
+    pcSlice->getSPS()->getMaxCUWidth()) * ((pcSlice->getSPS()->getPicHeightInLumaSamples() + pcSlice->getSPS()->getMaxCUHeight() - 1) / 
+    pcSlice->getSPS()->getMaxCUHeight());
 	//UInt sliceSegmentAddress = 0;
   //calculate number of bits required for slice address
   Int maxSliceSegmentAddress = pcSlice->getPic()->getNumberOfCtusInFrame();
 	Int bitsSliceSegmentAddress = 0;
-  while (maxSliceSegmentAddress>(1 << bitsSliceSegmentAddress))
+  while (numCTUs>(1 << bitsSliceSegmentAddress))
 	{
 		bitsSliceSegmentAddress++;
 	}
+  std::cout << "Width: " << pcSlice->getSPS()->getPicWidthInLumaSamples() << std::endl <<
+    "MaxCUWidth: " << pcSlice->getSPS()->getMaxCUWidth() << std::endl <<
+    "Height: " << pcSlice->getSPS()->getPicHeightInLumaSamples() << std::endl <<
+    "MaxCUHeight: " << pcSlice->getSPS()->getMaxCUHeight() << std::endl;
 	//const Int ctuTsAddress = (numCTUs / pcSlice->getNumMCTSTile()) * pcSlice->getCountTile();
-  std::cout << "maxSliceSegmentAdd: " << maxSliceSegmentAddress << std::endl;
 
-	const Int sliceSegmentRsAddress = pcSlice->getSliceSegmentRsAddress();//edit JW
+	const Int sliceSegmentRsAddress = pcSlice->getSliceSegmentRsAddress(); //edit JW
   WRITE_FLAG( sliceSegmentRsAddress==0, "first_slice_segment_in_pic_flag" );
   if ( pcSlice->getRapPicFlag() )
   {
@@ -1247,6 +1252,16 @@ Void TEncCavlc::codeSliceHeader(TComSlice* pcSlice)
       else
       {
         WRITE_FLAG( 1, "short_term_ref_pic_set_sps_flag");
+
+        /*Int numBits = 0;
+        while ((1 << numBits) < pcSlice->getSPS()->getRPSList()->getNumberOfReferencePictureSets())
+        {
+          numBits++;
+        }
+        if (numBits > 0)
+        {
+          WRITE_CODE(pcSlice->getRPSidx(), numBits, "short_term_ref_pic_set_idx");
+        }*/
        
 				//pcSlice->getNumBits()
 				if (pcSlice->getNumBits() > 0)
@@ -1257,7 +1272,6 @@ Void TEncCavlc::codeSliceHeader(TComSlice* pcSlice)
       }
       if(pcSlice->getSPS()->getLongTermRefsPresent())
       {
-
         Int bitsForLtrpInSPS = 0;
         while (pcSlice->getSPS()->getNumLongTermRefPicSPS() > (1 << bitsForLtrpInSPS))
         {

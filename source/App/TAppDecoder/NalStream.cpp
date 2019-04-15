@@ -69,6 +69,9 @@ Void NalStream::readNALUnit(InputNALUnit& nalu)
   {
     TComSPS*		sps = new TComSPS();
     mEntropyDecoder.decodeSPS(sps);
+    //Test
+    sps->setPicWidthInLumaSamples(512);
+    sps->setPicHeightInLumaSamples(320);
 
     mParameterSetManager.storeSPS(sps, nalu.getBitstream().getFifo());
 

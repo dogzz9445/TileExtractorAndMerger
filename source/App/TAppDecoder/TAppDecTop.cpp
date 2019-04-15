@@ -337,6 +337,12 @@ Void TAppDecTop::xWriteBitstream(
   slice.setTLayerInfo(inNal.m_temporalId);
   slice.setLFCrossSliceBoundaryFlag(false);
 
+  Int EntireWidth = 512;
+  Int EntireHeight = 320;
+
+  //slice.getSPS()->setPicWidthInLumaSamples(EntireWidth);
+  //slice.getSPS()->setPicHeightInLumaSamples(EntireHeight);
+
   if (tileId == 0)
   {
     slice.setSliceSegmentRsAddress(0);
@@ -347,11 +353,11 @@ Void TAppDecTop::xWriteBitstream(
   }
   else if (tileId == 2)
   {
-    slice.setSliceSegmentRsAddress(32);
+    slice.setSliceSegmentRsAddress(16);
   }
   else if (tileId == 3)
   {
-    slice.setSliceSegmentRsAddress(36);
+    slice.setSliceSegmentRsAddress(20);
   }
 
   if (slice.getSliceType() == I_SLICE)
@@ -377,6 +383,7 @@ Void TAppDecTop::xWriteBitstream(
   bsNALUHeader.write(inNal.m_nuhLayerId, 6);   // nuh_layer_id
   bsNALUHeader.write(inNal.m_temporalId + 1, 3); // nuh_temporal_id_plus1
 
+  std::cout << nalUnitTypeToString(inNal.m_nalUnitType) << ": " << bsNALUHeader.getByteStreamLength() << std::endl;
   out.write(reinterpret_cast<const TChar*>(bsNALUHeader.getByteStream()), bsNALUHeader.getByteStreamLength());
 
   TComOutputBitstream bsSliceHeader;
@@ -388,7 +395,8 @@ Void TAppDecTop::xWriteBitstream(
   vector<uint8_t> outputSliceHeaderBuffer;
   std::size_t outputSliceHeaderAmount = 0;
   outputSliceHeaderAmount = addEmulationPreventionByte(outputSliceHeaderBuffer, bsSliceHeader.getFIFO());
-  
+
+  std::cout << nalUnitTypeToString(inNal.m_nalUnitType) << ": " << outputSliceHeaderAmount << std::endl;
   out.write(reinterpret_cast<const TChar*>(&(*outputSliceHeaderBuffer.begin())), outputSliceHeaderAmount);
 
   TComInputBitstream** ppcSubstreams = NULL;
@@ -406,6 +414,8 @@ Void TAppDecTop::xWriteBitstream(
   vector<uint8_t> outputSliceRbspBuffer;
   std::size_t outputRbspHeaderAmount = 0;
   outputRbspHeaderAmount = addEmulationPreventionByte(outputSliceRbspBuffer, sliceRbspBuf);
+
+  std::cout << nalUnitTypeToString(inNal.m_nalUnitType) << ": " << outputRbspHeaderAmount << std::endl;
   out.write(reinterpret_cast<const TChar*>(&(*outputSliceRbspBuffer.begin())), outputRbspHeaderAmount);
 }
 
