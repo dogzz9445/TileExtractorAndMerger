@@ -340,8 +340,8 @@ Void TAppDecTop::xWriteBitstream(
   Int EntireWidth = 512;
   Int EntireHeight = 320;
 
-  //slice.getSPS()->setPicWidthInLumaSamples(EntireWidth);
-  //slice.getSPS()->setPicHeightInLumaSamples(EntireHeight);
+  // slice.getSPS()->setPicWidthInLumaSamples(EntireWidth);
+  // slice.getSPS()->setPicHeightInLumaSamples(EntireHeight);
 
   if (tileId == 0)
   {
@@ -403,6 +403,8 @@ Void TAppDecTop::xWriteBitstream(
   TComInputBitstream*  pcBitstream = &(inNal.getBitstream());
   const UInt uiNumSubstreams = slice.getNumberOfSubstreamSizes() + 1;
 
+  std::cout << "NumberSubStreams: " << slice.getNumberOfSubstreamSizes() << std::endl;
+
   // init each couple {EntropyDecoder, Substream}
   ppcSubstreams = new TComInputBitstream*[uiNumSubstreams];
   for (UInt ui = 0; ui < uiNumSubstreams; ui++)
@@ -410,6 +412,8 @@ Void TAppDecTop::xWriteBitstream(
     ppcSubstreams[ui] = pcBitstream->extractSubstream(ui + 1 < uiNumSubstreams ? (slice.getSubstreamSize(ui) << 3) : pcBitstream->getNumBitsLeft());
   }
   vector<uint8_t>& sliceRbspBuf = ppcSubstreams[0]->getFifo();
+
+  std::cout << "sliceRbspBuf: " << sliceRbspBuf.size() << std::endl;
 
   vector<uint8_t> outputSliceRbspBuffer;
   std::size_t outputRbspHeaderAmount = 0;

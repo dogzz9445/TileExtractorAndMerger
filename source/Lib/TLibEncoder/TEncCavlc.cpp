@@ -1177,9 +1177,13 @@ Void TEncCavlc::codeSliceHeader(TComSlice* pcSlice)
  // }
 	//*/
  // pcSlice->get
-	Int numCTUs = ((pcSlice->getSPS()->getPicWidthInLumaSamples() + pcSlice->getSPS()->getMaxCUWidth() - 1) / 
-    pcSlice->getSPS()->getMaxCUWidth()) * ((pcSlice->getSPS()->getPicHeightInLumaSamples() + pcSlice->getSPS()->getMaxCUHeight() - 1) / 
-    pcSlice->getSPS()->getMaxCUHeight());
+	Int numCTUs = ((pcSlice->getSPS()->getPicWidthInLumaSamples() + pcSlice->getSPS()->getMaxCUWidth() - 1) / pcSlice->getSPS()->getMaxCUWidth()) * 
+    ((pcSlice->getSPS()->getPicHeightInLumaSamples() + pcSlice->getSPS()->getMaxCUHeight() - 1) / pcSlice->getSPS()->getMaxCUHeight());
+  std::cout << "Width: " << pcSlice->getSPS()->getPicWidthInLumaSamples() << std::endl <<
+    "MaxCUWidth: " << pcSlice->getSPS()->getMaxCUWidth() << std::endl <<
+    "Height: " << pcSlice->getSPS()->getPicHeightInLumaSamples() << std::endl <<
+    "MaxCUHeight: " << pcSlice->getSPS()->getMaxCUHeight() << std::endl <<
+    "numCTUs: " << numCTUs << std::endl;
 	//UInt sliceSegmentAddress = 0;
   //calculate number of bits required for slice address
   Int maxSliceSegmentAddress = pcSlice->getPic()->getNumberOfCtusInFrame();
@@ -1188,10 +1192,6 @@ Void TEncCavlc::codeSliceHeader(TComSlice* pcSlice)
 	{
 		bitsSliceSegmentAddress++;
 	}
-  std::cout << "Width: " << pcSlice->getSPS()->getPicWidthInLumaSamples() << std::endl <<
-    "MaxCUWidth: " << pcSlice->getSPS()->getMaxCUWidth() << std::endl <<
-    "Height: " << pcSlice->getSPS()->getPicHeightInLumaSamples() << std::endl <<
-    "MaxCUHeight: " << pcSlice->getSPS()->getMaxCUHeight() << std::endl;
 	//const Int ctuTsAddress = (numCTUs / pcSlice->getNumMCTSTile()) * pcSlice->getCountTile();
 
 	const Int sliceSegmentRsAddress = pcSlice->getSliceSegmentRsAddress(); //edit JW
