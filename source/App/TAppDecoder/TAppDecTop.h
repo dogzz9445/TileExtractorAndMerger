@@ -76,24 +76,15 @@
 class TAppDecTop : public TAppDecCfg
 {
 private:
-  
 	//editJW
 	SEIReader												m_seiReader;
 	std::ostream									 *m_pSEIOutputStream;
-  TEncEntropy											m_cEntropyCoder;
-  TDecEntropy											m_cEntropyDecoder;
-  TEncCavlc												m_cCavlcCoder;
-  TDecCavlc												m_cCavlcDecoder;
-	ParameterSetManager*						m_oriParameterSetManager;
-	ParameterSetManager							m_parameterSetManager;
 	SliceAddressTsRsOrder						m_manageSliceAddress;
 	Int															m_extSPSId;
 	Int															m_extPPSId;
 	Int															m_extNumCTUs;
 	
   std::ofstream                   m_seiMessageFileStream;         ///< Used for outputing SEI messages.
-
-  NalStream                       *m_pNalStreams;
 
 public:
   TAppDecTop();
@@ -122,7 +113,7 @@ private:
   Void xWriteVPS(AccessUnit& accessUnit, const TComVPS* vps);
   Void xWriteSPS(AccessUnit& accessUnit, const TComSPS* sps);
   Void xWritePPS(AccessUnit& accessUnit, const TComPPS* pps);
-  Void xWriteBitstream(std::ostream& out, AccessUnit &accessUnit, InputNALUnit& inNal, NalStream* nalStream, Int& tileId);
+  Void xWriteBitstream(InputNALUnit& nalUnit, ParameterSetManager& para);
   // TODO:
   // WriteSEI
   // Void xWriteSEI(std::ostream& out, OutputNALUnit)

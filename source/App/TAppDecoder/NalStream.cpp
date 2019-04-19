@@ -50,7 +50,7 @@ Void NalStream::readNALUnit(InputNALUnit& nalu)
   mEntropyDecoder.setEntropyDecoder(&mCavlcDecoder);
   mEntropyDecoder.setBitstream(&(nalu.getBitstream()));
     
-  std::cout << nalUnitTypeToString(nalu.m_nalUnitType) << std::endl;
+  std::cout << "NAL_TYPE: " << nalUnitTypeToString(nalu.m_nalUnitType) << std::endl;
   switch (nalu.m_nalUnitType)
   {
   case NAL_UNIT_VPS:

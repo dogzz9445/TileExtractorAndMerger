@@ -1619,6 +1619,7 @@ Void TDecCavlc::parseSliceHeader(
 #if RExt__DECODER_DEBUG_BIT_STATISTICS
   TComCodingStatistics::IncrementStatisticEP(STATS__BYTE_ALIGNMENT_BITS,m_pcBitstream->readByteAlignment(),0);
 #else
+  std::cout << "rbsp bits: " << m_pcBitstream->getNumBitsRead() << std::endl;
   m_pcBitstream->readByteAlignment();
 #endif
 

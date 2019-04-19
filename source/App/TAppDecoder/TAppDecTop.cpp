@@ -42,6 +42,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <fstream>
 
 #include "TAppDecTop.h"
 
@@ -58,16 +59,9 @@ static const UChar start_code_prefix[] = { 0, 0, 0, 1 };
 TAppDecTop::TAppDecTop()
 : m_seiReader()
  ,m_pSEIOutputStream(NULL)
- ,m_cCavlcCoder()
- ,m_cCavlcDecoder()
- ,m_cEntropyCoder()
- ,m_cEntropyDecoder()
- ,m_parameterSetManager()
- ,m_oriParameterSetManager()
  ,m_manageSliceAddress()
  ,m_extSPSId()
  ,m_extPPSId()
- , m_pNalStreams(NULL)
 {
 }
 
@@ -77,13 +71,6 @@ Void TAppDecTop::create()
 
 Void TAppDecTop::destroy()
 {
-  m_outBitstreamFileName.clear();
-
-  if (m_pNalStreams)
-  {
-    delete[] m_pNalStreams;
-    m_pNalStreams = NULL;
-  }
 }
 
 // ====================================================================================================================
@@ -100,261 +87,199 @@ Void TAppDecTop::destroy()
  */
 Void TAppDecTop::merge()
 {
-  m_pNalStreams = new NalStream[m_numberOfTiles];
-  for (int i = 0; i < m_numberOfTiles; i++)
+  std::ifstream mStream(m_inBitstreamFileNames, std::ifstream::in | std::ifstream::binary);
+
+  if (!mStream.is_open())
   {
-    m_pNalStreams[i].addFile(m_inBitstreamFileNames[i].c_str());
+    std::cerr << "Warning: File is not opened\n";
+    exit(EXIT_FAILURE);
   }
+
+  InputByteStream mByteStream(mStream);
 
   xInitDecLib(); 
   xInitLogSEI();
 
-  m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
-  m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
+  TDecEntropy mEntropyDecoder = TDecEntropy();
+  TDecCavlc mCavlcDecoder = TDecCavlc();
+  ParameterSetManager mParameterSetManager = ParameterSetManager();
+  AnnexBStats mStats = AnnexBStats();
 
-  // Output Stream
-  fstream mergedFile(m_outBitstreamFileName, fstream::binary | fstream::out);
-  if (!mergedFile)
-  {
-    std::cerr << "\nfailed to open bitstream file for writing\n";
-    exit(EXIT_FAILURE);
-  }
+  mEntropyDecoder.setEntropyDecoder(&mCavlcDecoder);
 
-//---------GOP 단위로 MERGING---------------------------
-//---------VPS, SPS, PPS-------------------------------
-  if (mergedFile.is_open())
+  while (mStream)
   {
-    // VPS SPS, PPS 정보 파싱
-    for (Int iVPSSPSPPS = 0; iVPSSPSPPS < 3; iVPSSPSPPS++)
+    InputNALUnit nalu;
+    byteStreamNALUnit(mByteStream, nalu.getBitstream().getFifo(), mStats);
+
+    read(nalu);
+    if (nalu.getBitstream().getFifo().empty())
     {
-      for (Int iTile = 0; iTile < m_numberOfTiles; iTile++)
-      {
-        InputNALUnit nalu;
-        m_pNalStreams[iTile].readNALUnit(nalu);
-      }
+      std::cerr << "Waring: Attempt to decode an empty NAL unit\n";
     }
 
-    std::cout << "Writing VPS SPS PPS...\n";
-    // VPS, SPS, PPS 정보 믹싱, 쓰기
-    // FIXME:
-    // first VPS, SPS, PPS 파싱해오는게 아니게 고쳐야됨
-    // VPS, SPS, PPS 정보 믹싱
-    InputNALUnit nalu_ivps;
-    TComVPS* inVps = m_pNalStreams[0].getVPS(nalu_ivps);
-    InputNALUnit nalu_isps;
-    TComSPS* inSps = m_pNalStreams[0].getSPS(nalu_isps);
-    InputNALUnit nalu_ipps;
-    TComPPS* inPps = m_pNalStreams[0].getPPS(nalu_ipps);
-      
-    inSps->setPicWidthInLumaSamples(m_iTargetWidth);
-    inSps->setPicHeightInLumaSamples(m_iTargetHeight);
+    mEntropyDecoder.setEntropyDecoder(&mCavlcDecoder);
+    mEntropyDecoder.setBitstream(&(nalu.getBitstream()));
 
-    std::vector<Int> tileWidths;
-    tileWidths.push_back(256);
-    tileWidths.push_back(256);
-
-    std::vector<Int> tileHeigths;
-    tileHeigths.push_back(128);
-    tileHeigths.push_back(192);
-
-    inPps->setTilesEnabledFlag(true);
-    inPps->setTileUniformSpacingFlag(true);
-    inPps->setTileColumnWidth(tileWidths);
-    inPps->setTileRowHeight(tileHeigths);
-    inPps->setNumTileColumnsMinus1(m_numberOfTilesInColumn - 1);
-    inPps->setNumTileRowsMinus1(m_numberOfTilesInRow - 1);
-
-    // FIXME:
-    // VPS, SPS, PPS 수정해서 쓰기
-    xWriteVPSSPSPPS(mergedFile, inVps, inSps, inPps);
-
-    //---------FRAME 단위로 SLICE 쓰기---------------------------
-    // FIXME:
-    // GOP 단위로 고쳐야됨
-    // // VPS, SPS, PPS 들어오면
-    for (Int iFrame = 0; iFrame < /*max frame*/32; iFrame++)
+    std::cout << "NAL_TYPE: " << nalUnitTypeToString(nalu.m_nalUnitType) << std::endl;
+    switch (nalu.m_nalUnitType)
     {
-      AccessUnit accessUnit;
-      for (Int iTile = 0; iTile < m_numberOfTiles; iTile++)
-      {
-        InputNALUnit nalu = InputNALUnit();
-        m_pNalStreams[iTile].getSliceNAL(nalu);
+    case NAL_UNIT_VPS:
+    {
+      TComVPS*    vps = new TComVPS();
+      mEntropyDecoder.decodeVPS(vps);
 
-        // FIXME:
-        // SEI Message면 다시 읽기
-        while (nalu.m_nalUnitType == NAL_UNIT_PREFIX_SEI)
-        {
-          if (iTile == 0)
-          {
-            vector<uint8_t> outputBuffer;
-            std::size_t outputAmount = 0;
-            outputAmount = addEmulationPreventionByte(outputBuffer, nalu.getBitstream().getFifo());
-            mergedFile.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
-            mergedFile.write(reinterpret_cast<const TChar*>(&(*outputBuffer.begin())), outputAmount);
-          }
-          nalu = InputNALUnit();
-          m_pNalStreams[iTile].getSliceNAL(nalu);
-        }
+      mParameterSetManager.storeVPS(vps, nalu.getBitstream().getFifo());
+    }
+    break;
+    case NAL_UNIT_SPS:
+    {
+      TComSPS*		sps = new TComSPS();
+      mEntropyDecoder.decodeSPS(sps);
 
-        xWriteBitstream(mergedFile, accessUnit, nalu, &m_pNalStreams[iTile], iTile);
-      }
-    } 
+      mParameterSetManager.storeSPS(sps, nalu.getBitstream().getFifo());
+    }
+    break;
+    case NAL_UNIT_PPS:
+    {
+      TComPPS*		pps = new TComPPS();
+      mEntropyDecoder.decodePPS(pps);
+
+      mParameterSetManager.storePPS(pps, nalu.getBitstream().getFifo());
+    }
+    break;
+    case NAL_UNIT_PREFIX_SEI:
+    {
+    }
+    break;
+    case NAL_UNIT_CODED_SLICE_TRAIL_R:
+    case NAL_UNIT_CODED_SLICE_TRAIL_N:
+    case NAL_UNIT_CODED_SLICE_TSA_R:
+    case NAL_UNIT_CODED_SLICE_TSA_N:
+    case NAL_UNIT_CODED_SLICE_STSA_R:
+    case NAL_UNIT_CODED_SLICE_STSA_N:
+    case NAL_UNIT_CODED_SLICE_BLA_W_LP:
+    case NAL_UNIT_CODED_SLICE_BLA_W_RADL:
+    case NAL_UNIT_CODED_SLICE_BLA_N_LP:
+    case NAL_UNIT_CODED_SLICE_IDR_W_RADL:
+    case NAL_UNIT_CODED_SLICE_IDR_N_LP:
+    case NAL_UNIT_CODED_SLICE_CRA:
+    case NAL_UNIT_CODED_SLICE_RADL_N:
+    case NAL_UNIT_CODED_SLICE_RADL_R:
+    case NAL_UNIT_CODED_SLICE_RASL_N:
+    case NAL_UNIT_CODED_SLICE_RASL_R:
+    {
+      xWriteBitstream(nalu, mParameterSetManager);
+    }
+    break;
+    default:
+      break;
+    }
   } 
-
-  mergedFile.close();
-  mergedFile.clear();
 }
 
 // ====================================================================================================================
 // Protected member functions
 // ====================================================================================================================
 
-Void TAppDecTop::xWriteVPSSPSPPS(std::ostream& out, const TComVPS* vps, const TComSPS* sps, const TComPPS* pps)
+Void TAppDecTop::xWriteBitstream(InputNALUnit& nalUnit, ParameterSetManager& para)
 {
-  AccessUnit accessUnit;
-  xWriteVPS(accessUnit, vps);
-  xWriteSPS(accessUnit, sps);
-  xWritePPS(accessUnit, pps);
+  TDecEntropy mEntropyDecoder = TDecEntropy();
+  TDecCavlc mCavlcDecoder = TDecCavlc();
 
-  const vector<UInt>& statsTop = writeAnnexB(out, accessUnit);
-}
-
-Void TAppDecTop::xWriteVPS(AccessUnit &accessUnit, const TComVPS* vps)
-{
-  OutputNALUnit nalu_VPS(NAL_UNIT_VPS);
-  m_cEntropyCoder.setBitstream(&(nalu_VPS.m_Bitstream));
-  m_cEntropyCoder.encodeVPS(vps);
-  accessUnit.push_back(new NALUnitEBSP(nalu_VPS));
-}
-
-Void TAppDecTop::xWriteSPS(AccessUnit &accessUnit, const TComSPS* sps)
-{
-  OutputNALUnit nalu_SPS(NAL_UNIT_SPS);
-  m_cEntropyCoder.setBitstream(&(nalu_SPS.m_Bitstream));
-  m_cEntropyCoder.encodeSPS(sps);
-  accessUnit.push_back(new NALUnitEBSP(nalu_SPS));
-}
-
-Void TAppDecTop::xWritePPS(AccessUnit &accessUnit, const TComPPS* pps)
-{
-  OutputNALUnit nalu_PPS(NAL_UNIT_PPS);
-  m_cEntropyCoder.setBitstream(&(nalu_PPS.m_Bitstream));
-  m_cEntropyCoder.encodePPS(pps);
-  accessUnit.push_back(new NALUnitEBSP(nalu_PPS));
-}
-
-Void TAppDecTop::xWriteBitstream(
-  std::ostream& out, 
-  AccessUnit&   accessUnit, 
-  InputNALUnit& inNal, 
-  NalStream*    nalStream, 
-  Int&          tileId)
-{
-  m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
-  m_cEntropyDecoder.setBitstream(&inNal.getBitstream());
+  mEntropyDecoder.setEntropyDecoder(&mCavlcDecoder);
+  mEntropyDecoder.setBitstream(&nalUnit.getBitstream());
 
   TComSlice slice;
   slice.initSlice();
-  slice.setNalUnitType(inNal.m_nalUnitType);
+  slice.setNalUnitType(nalUnit.m_nalUnitType);
 
-  Bool nonReferenceFlag = (
-    slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_TRAIL_N ||
-    slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_TSA_N ||
-    slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_STSA_N ||
-    slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_RADL_N ||
-    slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N
-    );
-  slice.setTemporalLayerNonReferenceFlag(nonReferenceFlag);
-  slice.setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
-  slice.setTLayerInfo(inNal.m_temporalId);
-  slice.setLFCrossSliceBoundaryFlag(false);
-
-  m_cEntropyDecoder.decodeSliceHeader(&slice, nalStream->getParameterSetManager(), &m_parameterSetManager, 0);
+  mEntropyDecoder.decodeSliceHeader(&slice, &para, &para, 0);
   
-  std::cout << "read bytes: " << inNal.getBitstream().getNumBitsRead() << std::endl
-    << "left bytes: " << inNal.getBitstream().getNumBitsLeft() << std::endl;
+  std::cout << "read bits: " << nalUnit.getBitstream().getNumBitsRead() << std::endl
+    << "left bits: " << nalUnit.getBitstream().getNumBitsLeft() << std::endl;
   
-  Int EntireWidth = 512;
-  Int EntireHeight = 320;
+  //Int EntireWidth = 512;
+  //Int EntireHeight = 320;
 
-  // slice.getSPS()->setPicWidthInLumaSamples(EntireWidth);
-  // slice.getSPS()->setPicHeightInLumaSamples(EntireHeight);
+  //// slice.getSPS()->setPicWidthInLumaSamples(EntireWidth);
+  //// slice.getSPS()->setPicHeightInLumaSamples(EntireHeight);
 
 
-  if (tileId == 0)
-  {
-    slice.setSliceSegmentRsAddress(0);
-  }
-  else if (tileId == 1)
-  {
-    slice.setSliceSegmentRsAddress(4);
-  }
-  else if (tileId == 2)
-  {
-    slice.setSliceSegmentRsAddress(16);
-  }
-  else if (tileId == 3)
-  {
-    slice.setSliceSegmentRsAddress(20);
-  }
+  //if (tileId == 0)
+  //{
+  //  slice.setSliceSegmentRsAddress(0);
+  //}
+  //else if (tileId == 1)
+  //{
+  //  slice.setSliceSegmentRsAddress(4);
+  //}
+  //else if (tileId == 2)
+  //{
+  //  slice.setSliceSegmentRsAddress(16);
+  //}
+  //else if (tileId == 3)
+  //{
+  //  slice.setSliceSegmentRsAddress(20);
+  //}
 
-  if (slice.getSliceType() == I_SLICE)
-  {
-    out.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
-  }
-  else
-  {
-    if (slice.getCountTile() == 0)
-    {
-      out.write(reinterpret_cast<const TChar*>(start_code_prefix), 4);
-    }
-    else
-    {
-      out.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
-    }
-  }
+  //if (slice.getSliceType() == I_SLICE)
+  //{
+  //  out.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
+  //}
+  //else
+  //{
+  //  if (slice.getCountTile() == 0)
+  //  {
+  //    out.write(reinterpret_cast<const TChar*>(start_code_prefix), 4);
+  //  }
+  //  else
+  //  {
+  //    out.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
+  //  }
+  //}
 
-  TComOutputBitstream bsNALUHeader;
+  //TComOutputBitstream bsNALUHeader;
 
-  bsNALUHeader.write(0, 1);                    // forbidden_zero_bit
-  bsNALUHeader.write(inNal.m_nalUnitType, 6);  // nal_unit_type
-  bsNALUHeader.write(inNal.m_nuhLayerId, 6);   // nuh_layer_id
-  bsNALUHeader.write(inNal.m_temporalId + 1, 3); // nuh_temporal_id_plus1
+  //bsNALUHeader.write(0, 1);                    // forbidden_zero_bit
+  //bsNALUHeader.write(inNal.m_nalUnitType, 6);  // nal_unit_type
+  //bsNALUHeader.write(inNal.m_nuhLayerId, 6);   // nuh_layer_id
+  //bsNALUHeader.write(inNal.m_temporalId + 1, 3); // nuh_temporal_id_plus1
 
-  std::cout << nalUnitTypeToString(inNal.m_nalUnitType) << ": " << bsNALUHeader.getByteStreamLength() << std::endl;
-  out.write(reinterpret_cast<const TChar*>(bsNALUHeader.getByteStream()), bsNALUHeader.getByteStreamLength());
+  //std::cout << nalUnitTypeToString(inNal.m_nalUnitType) << ": " << bsNALUHeader.getByteStreamLength() << std::endl;
+  //out.write(reinterpret_cast<const TChar*>(bsNALUHeader.getByteStream()), bsNALUHeader.getByteStreamLength());
 
-  TComOutputBitstream bsSliceHeader;
-  m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
-  m_cEntropyCoder.setBitstream(&bsSliceHeader);
-  m_cEntropyCoder.encodeSliceHeader(&slice);
-  bsSliceHeader.writeByteAlignment();
+  //TComOutputBitstream bsSliceHeader;
+  //m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
+  //m_cEntropyCoder.setBitstream(&bsSliceHeader);
+  //m_cEntropyCoder.encodeSliceHeader(&slice);
+  //bsSliceHeader.writeByteAlignment();
 
-  vector<uint8_t> outputSliceHeaderBuffer;
-  std::size_t outputSliceHeaderAmount = 0;
-  outputSliceHeaderAmount = addEmulationPreventionByte(outputSliceHeaderBuffer, bsSliceHeader.getFIFO());
-  // bsSliceHeader에 add해서 처리할 수 있도록
+  //vector<uint8_t> outputSliceHeaderBuffer;
+  //std::size_t outputSliceHeaderAmount = 0;
+  //outputSliceHeaderAmount = addEmulationPreventionByte(outputSliceHeaderBuffer, bsSliceHeader.getFIFO());
+  //// bsSliceHeader에 add해서 처리할 수 있도록
 
-  out.write(reinterpret_cast<const TChar*>(&(*outputSliceHeaderBuffer.begin())), outputSliceHeaderAmount);
+  //out.write(reinterpret_cast<const TChar*>(&(*outputSliceHeaderBuffer.begin())), outputSliceHeaderAmount);
 
-  TComInputBitstream** ppcSubstreams = NULL;
-  TComInputBitstream*  pcBitstream = &(inNal.getBitstream());
-  const UInt uiNumSubstreams = slice.getNumberOfSubstreamSizes() + 1;
+  //TComInputBitstream** ppcSubstreams = NULL;
+  //TComInputBitstream*  pcBitstream = &(inNal.getBitstream());
+  //const UInt uiNumSubstreams = slice.getNumberOfSubstreamSizes() + 1;
 
-  // init each couple {EntropyDecoder, Substream}
-  ppcSubstreams = new TComInputBitstream*[uiNumSubstreams];
-  for (UInt ui = 0; ui < uiNumSubstreams; ui++)
-  {
-    ppcSubstreams[ui] = pcBitstream->extractSubstream(ui + 1 < uiNumSubstreams ? (slice.getSubstreamSize(ui) << 3) : pcBitstream->getNumBitsLeft());
-    //ppcSubstreams[ui] = pcBitstream->extractSubstream(slice.getSubstreamSize(ui) << 3);
-  }
-  vector<uint8_t>& sliceRbspBuf = ppcSubstreams[0]->getFifo();
+  //// init each couple {EntropyDecoder, Substream}
+  //ppcSubstreams = new TComInputBitstream*[uiNumSubstreams];
+  //for (UInt ui = 0; ui < uiNumSubstreams; ui++)
+  //{
+  //  ppcSubstreams[ui] = pcBitstream->extractSubstream(ui + 1 < uiNumSubstreams ? (slice.getSubstreamSize(ui) << 3) : pcBitstream->getNumBitsLeft());
+  //  //ppcSubstreams[ui] = pcBitstream->extractSubstream(slice.getSubstreamSize(ui) << 3);
+  //}
+  //vector<uint8_t>& sliceRbspBuf = ppcSubstreams[0]->getFifo();
 
-  vector<uint8_t> outputSliceRbspBuffer;
-  std::size_t outputRbspHeaderAmount = 0;
-  outputRbspHeaderAmount = addEmulationPreventionByte(outputSliceRbspBuffer, sliceRbspBuf);
+  //vector<uint8_t> outputSliceRbspBuffer;
+  //std::size_t outputRbspHeaderAmount = 0;
+  //outputRbspHeaderAmount = addEmulationPreventionByte(outputSliceRbspBuffer, sliceRbspBuf);
 
-  out.write(reinterpret_cast<const TChar*>(&(*outputSliceRbspBuffer.begin())), outputRbspHeaderAmount);
+  //out.write(reinterpret_cast<const TChar*>(&(*outputSliceRbspBuffer.begin())), outputRbspHeaderAmount);
 }
 
 
@@ -396,64 +321,6 @@ std::size_t TAppDecTop::addEmulationPreventionByte(vector<uint8_t>& outputBuffer
 	return outputAmount;
 }
 
-Void TAppDecTop::writeParameter(fstream& out, NalUnitType nalUnitType, UInt nuhLayerId, UInt temporalId, vector<uint8_t>& rbsp, ParameterSetManager& parameterSetmanager)
-{
-	
-	TComOutputBitstream bsNALUHeader;
-
-	bsNALUHeader.write(0, 1);              // forbidden_zero_bit
-	bsNALUHeader.write(nalUnitType, 6);    // nal_unit_type
-	bsNALUHeader.write(nuhLayerId, 6);     // nuh_layer_id
-	bsNALUHeader.write(temporalId + 1, 3); // nuh_temporal_id_plus1
-
-	out.write(reinterpret_cast<const TChar*>(bsNALUHeader.getByteStream()), bsNALUHeader.getByteStreamLength());
-
-	vector<uint8_t> outputBuffer;
-	std::size_t outputAmount = 0;
-	outputAmount = addEmulationPreventionByte(outputBuffer, rbsp);
-
-	out.write(reinterpret_cast<const TChar*>(&(*outputBuffer.begin())), outputAmount);
-
-	
-	if (nalUnitType == NAL_UNIT_SPS)
-	{
-		TComSPS*		sps = new TComSPS();
-		InputNALUnit nalu;
-		vector<uint8_t>& nalUnitBuf = nalu.getBitstream().getFifo();
-		vector<uint8_t>& nalUnitHeaderBuf = bsNALUHeader.getFIFO();
-		nalUnitBuf.resize(bsNALUHeader.getByteStreamLength() + outputAmount);
-		UChar *NewDataArray = &nalUnitBuf[0];
-		UChar *OldHeaderDataArray = &nalUnitHeaderBuf[0];
-		memcpy(NewDataArray, OldHeaderDataArray, bsNALUHeader.getByteStreamLength());
-		memcpy(NewDataArray + bsNALUHeader.getByteStreamLength(), &outputBuffer[0], outputAmount);
-		read(nalu);
-    m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
-		m_cEntropyDecoder.setBitstream(&(nalu.getBitstream()));
-		m_cEntropyDecoder.decodeSPS(sps);
-		m_parameterSetManager.storeSPS(sps, nalu.getBitstream().getFifo());
-		m_extSPSId = sps->getSPSId();
-		m_extNumCTUs = ((sps->getPicWidthInLumaSamples() + sps->getMaxCUWidth() - 1) / sps->getMaxCUWidth())*((sps->getPicHeightInLumaSamples() + sps->getMaxCUHeight() - 1) / sps->getMaxCUHeight());
-	
-	}
-	else if (nalUnitType == NAL_UNIT_PPS)
-	{
-		TComPPS*		pps = new TComPPS();
-		InputNALUnit nalu;
-		vector<uint8_t>& nalUnitBuf = nalu.getBitstream().getFifo();
-		vector<uint8_t>& nalUnitHeaderBuf = bsNALUHeader.getFIFO();
-		nalUnitBuf.resize(bsNALUHeader.getByteStreamLength() + outputAmount);
-		UChar *NewDataArray = &nalUnitBuf[0];
-		UChar *OldHeaderDataArray = &nalUnitHeaderBuf[0];
-		memcpy(NewDataArray, OldHeaderDataArray, bsNALUHeader.getByteStreamLength());
-		memcpy(NewDataArray + bsNALUHeader.getByteStreamLength(), &outputBuffer[0], outputAmount);
-		read(nalu);
-		m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
-		m_cEntropyDecoder.setBitstream(&(nalu.getBitstream()));
-		m_cEntropyDecoder.decodePPS(pps);
-		m_parameterSetManager.storePPS(pps, nalu.getBitstream().getFifo());
-		m_extPPSId = pps->getPPSId();
-	}
-}
 
 Void TAppDecTop::xInitDecLib()
 {
@@ -461,11 +328,6 @@ Void TAppDecTop::xInitDecLib()
 
 Void TAppDecTop::xInitLogSEI()
 {
-  if (!m_outputDecodedSEIMessagesFilename.empty())
-  {
-    std::ostream &os=m_seiMessageFileStream.is_open() ? m_seiMessageFileStream : std::cout;
-		setSEIMessageOutputStream(&os);
-  }
 }
 
 
