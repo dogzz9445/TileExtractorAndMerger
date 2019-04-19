@@ -93,8 +93,7 @@ private:
 	
   std::ofstream                   m_seiMessageFileStream;         ///< Used for outputing SEI messages.
 
-  NalStream *m_pNal;
-  list<AccessUnit> mOutputAccessUnits;
+  NalStream                       *m_pNalStreams;
 
 public:
   TAppDecTop();

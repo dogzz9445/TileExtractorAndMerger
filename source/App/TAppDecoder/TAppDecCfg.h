@@ -56,23 +56,25 @@
 class TAppDecCfg
 {
 protected:
-  std::string   m_bitstreamFileName;                    ///< input bitstream file name
+  std::vector<std::string> m_inBitstreamFileNames;
 	std::string   m_outBitstreamFileName;                    ///< input bitstream file name
-	Int           m_mctsEisIdTarget;
-	Int           m_mctsSetIdxTarget;
-	Int           m_mctsTidTarget;
   std::string   m_outputDecodedSEIMessagesFilename;   ///< filename to output decoded SEI messages to. If '-', then use stdout. If empty, do not output details.
-
+  Int           m_iTargetWidth;
+  Int           m_iTargetHeight;
   Int           m_numberOfTiles;
   Int           m_numberOfTilesInColumn;
   Int           m_numberOfTilesInRow;
 
+  std::vector<Int> m_tileWidths;
+  std::vector<Int> m_tileHegihts;
+  
+  Bool          m_tileUniformFlag;
+
 public:
   TAppDecCfg()
-  : m_bitstreamFileName()
-	, m_mctsEisIdTarget(0)
-	, m_mctsSetIdxTarget(0)
+    : m_outBitstreamFileName()
   , m_outputDecodedSEIMessagesFilename()
+  , m_tileUniformFlag(true)
   {
   }
 

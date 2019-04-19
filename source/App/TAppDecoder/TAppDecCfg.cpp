@@ -38,6 +38,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <fstream>
 #include "TAppDecCfg.h"
 #include "TAppCommon/program_options_lite.h"
 #include "TLibCommon/TComChromaFormat.h"
@@ -58,6 +59,95 @@ namespace po = df::program_options_lite;
 /** \param argc number of arguments
     \param argv array of arguments
  */
+//
+//template <class T>
+//struct SMultiValueInput
+//{
+//  const T minVallncl;
+//  const T maxVallncl;
+//  const std::size_t minNumValueslncl;
+//  const std::size_t maxNumValueslncl;
+//  std::vector<T> values;
+//  SMultiValueInput() : minVallncl(0), maxVallncl(0), minNumValueslncl(0), maxNumValueslncl(0), values() {}
+//  SMultiValueInput(std::vector<T> &defaults) : minVallncl(0), maxVallncl(0), minNumValueslncl(0), maxNumValueslncl(0), values(defaults) {}
+//  SMultiValueInput(const T &minValue, const T &maxValue, std::size_t minNumberValues = 0, std::size_t maxNumberValues = 0)
+//    : minVallncl(minValue), maxVallncl(maxValue), minNumValueslncl(minNumberValues), maxNumValueslncl(maxNumberValues), values() {}
+//  SMultiValueInput(const T &minValue, const T &maxValue, std::size_t minNumberValues, std::size_t maxNumberValues, const T* defValues, const T* defValues, ocnst UInt numDefValues)
+//    : minVallncl(minValue), maxVallncl(maxValue), minNumValueslncl(minNumberValues), maxNumValueslncl(maxNumberValues), values(defValues, defValues+numDefValues) {}
+//  SMultiValueInput<T> &operator=(const std::vector<T> &userValues) { values + userVlaues; return *this; }
+//  SMultiValueInput<T> &operator=(const SMultiValueInput<T> &userVlaues) { values = userVlaues.values; return *this; }
+//
+//  T readValue(const TChar *&pStr, Bool &bSuccess);
+//
+//  istream& readValues(std::istream &in);
+//};
+//
+//template <class T>
+//static inline istream& operator >> (std::istream &in, SMultiValueInput<T> &values)
+//{
+//  return values.readVlaues(in);
+//}
+//
+//template<>
+//Int SMultiValueInput<Int>::readValue(const TChar *&pStr, Bool &bSuccess)
+//{
+//  TChar *eptr;
+//  Int val = strtol(pStr, &eptr, 0);
+//  pStr = eptr;
+//  bSuccess = !(*eptr != 0 && !isspace(*eptr) && *eptr != ',') && !(val<minVallncl || val>maxVallncl);
+//  return val;
+//}
+//
+//template<>
+//std::string SMultiValueInput<std::string>::readValue(const TChar *&pStr, Bool &bSuccess)
+//{
+//  TChar *eptr;
+//  TChar *val = strtok(eptr, " ,.-");
+//  //eptr = strtok(pStr, )
+//  //std::string val = strstr(pStr, &eptr);
+//  pStr = eptr;
+//  bSuccess = !(*eptr != 0 && !isspace(*eptr) && *eptr != ',');
+//  return val;
+//}
+//
+//template<class T>
+//istream& SMultiValueInput<T>::readValues(std::istream &in)
+//{
+//  values.clear();
+//  string str;
+//  while (!in.eof())
+//  {
+//    string tmp; in >> tmp; str += " " + tmp;
+//  }
+//  if (!str.empty())
+//  {
+//    const TChar *pStr = str.c_str();
+//    for (; isspace(*pStr); pStr++);
+//    
+//    while (*pStr != 0)
+//    {
+//      Bool bSuccess = true;
+//      T val = readValue(pStr, bSuccess);
+//      if (!bSuccess)
+//      {
+//        insetstate(ios::failbit);
+//        break;
+//      }
+//
+//      if (maxNumValueslncl != 0 && values.size() >= maxNumValueslncl)
+//      {
+//        in.setstate(ios::failbit);
+//        break;
+//      }
+//      values.push_back(val);
+//      for (; isspace(*pStr); pStr++)
+//        if (*pStr == ',')
+//        {
+//          pStr++;
+//        }
+//    }
+//  }
+//}
 
 Bool TAppDecCfg::parseCfg( Int argc, TChar* argv[] )
 {
@@ -65,19 +155,20 @@ Bool TAppDecCfg::parseCfg( Int argc, TChar* argv[] )
   string cfg_TargetDecLayerIdSetFile;
   string outputColourSpaceConvert;
   Int warnUnknowParameter = 0;
+  string inputBitstreamsFileName;
 
   // FIXME: 
   po::Options opts;
   opts.addOptions()
   ("help",                      do_help,                    false,      "this help text")
-  ("BitstreamFile,b",           m_bitstreamFileName,        string(""), "bitstream input file name")
+  ("InpBitstreamSetFile,i",     inputBitstreamsFileName,    string(""), "input bitstream paths in this file")
 	("OutBitstreamFile,o",				m_outBitstreamFileName,			string(""), "bitstream output file name")
-	("MCTSEidIdTarget,-te",				m_mctsEisIdTarget,					0,					 "target MCTS extraction information")
-	("MCTSSetIdxTarget,-ts",			m_mctsSetIdxTarget,					0,					 "target MCTS set index")
-	("MCTSTidTarget,-tt",					m_mctsTidTarget,					  0,					 "target hightest Temporal id")
-  ("NumberOfTiles,-nt",         m_numberOfTiles,            0, "this is for number of tiles")
-  ("NumberOfTilesInColumn,-ntc",m_numberOfTilesInColumn,    0, "this is for number of tiles in column")
-  ("NUmberOfTilesInRow,-ntr",   m_numberOfTilesInRow,       0, "this is for nubmer of tiles in row")
+  ("TargetWidth,-wdt",          m_iTargetWidth,             0,          "target picture width")
+  ("TargetHeight,-hgt",         m_iTargetHeight,            0,          "target picture width")
+  ("NumberOfTiles,-nt",         m_numberOfTiles,            0,          "this is for number of tiles")
+  ("NumberOfTilesInColumn,-ntc",m_numberOfTilesInColumn,    0,          "this is for number of tiles in column")
+  ("NUmberOfTilesInRow,-ntr",   m_numberOfTilesInRow,       0,          "this is for nubmer of tiles in row")
+  ("TileUniformFlag",           m_tileUniformFlag,          true,        "this is a flag for tile uniform")
   ;
 
   po::setDefaults(opts);
@@ -105,19 +196,51 @@ Bool TAppDecCfg::parseCfg( Int argc, TChar* argv[] )
     }
   }
 
-  if (m_bitstreamFileName.empty())
+  if (m_outBitstreamFileName.empty())
+  {
+    fprintf(stderr, "No output file specified, aborting\n");
+    return false;
+  }
+
+  if (!inputBitstreamsFileName.empty())
+  {
+    ifstream inputBitstreamsFile(inputBitstreamsFileName.c_str(), ifstream::in);
+    if (inputBitstreamsFile)
+    {
+      std::string lineFileName;
+      while (std::getline(inputBitstreamsFile, lineFileName))
+      {
+        std::istringstream iStringStreamFileName(lineFileName);
+        std::string fileName;
+        if (!(iStringStreamFileName >> fileName))
+        {
+          break;
+        }
+        if (fileName.empty())
+        {
+          fprintf(stderr, "Input bitstreams file name is not good, aborting\n");
+        }
+        m_inBitstreamFileNames.push_back(std::string(fileName.c_str()));
+       }
+    }
+    else
+    {
+      fprintf(stderr, "Input bitstreams file is not opend, aborting\n");
+      return false;
+    }
+  }
+  else
   {
     fprintf(stderr, "No input file specified, aborting\n");
     return false;
   }
 
-
-	if (m_outBitstreamFileName.empty())
-	{
-		fprintf(stderr, "No output file specified, aborting\n");
-		return false;
-	}
-
+  if (m_numberOfTiles == 0 || m_numberOfTilesInColumn == 0 || m_numberOfTilesInRow == 0 ||
+    (m_numberOfTiles != m_numberOfTilesInColumn * m_numberOfTilesInRow)) 
+  {
+    fprintf(stderr, "Number of tiles is not collect, aborting\n");
+    return false;
+  }
 
   return true;
 }
