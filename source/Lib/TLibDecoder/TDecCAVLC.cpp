@@ -1005,7 +1005,7 @@ Void TDecCavlc::parseVPS(TComVPS* pcVPS)
 
 Void TDecCavlc::parseSliceHeader(
   TComSlice           *pcSlice, 
-  ParameterSetManager *oriParameterSetManager, 
+  ParameterSetManager *psManager, 
   ParameterSetManager *parameterSetManager, 
   const Int            prevTid0POC)
 {
@@ -1015,9 +1015,7 @@ Void TDecCavlc::parseSliceHeader(
 #if ENC_DEC_TRACE
   xTraceSliceHeader();
 #endif
-	TComPPS* oriPps = NULL;
   TComPPS* pps = NULL;
-	TComSPS* oriSps = NULL;
   TComSPS* sps = NULL;
 
   UInt firstSliceSegmentInPic;
@@ -1029,16 +1027,11 @@ Void TDecCavlc::parseSliceHeader(
   }
   READ_UVLC (    uiCode, "slice_pic_parameter_set_id" );  pcSlice->setPPSId(uiCode);
 	
-  //oriPps = oriParameterSetManager->getPPS(uiCode);
-  pps = oriParameterSetManager->getPPS(uiCode);
-  //pps	= parameterSetManager->getPPS(uiCode);
+  pps = psManager->getPPS(uiCode);
 	pcSlice->setPPS(pps); // edit JW
   //!KS: need to add error handling code here, if PPS is not available
   assert(pps!=0);
-
-	//oriSps = oriParameterSetManager->getSPS(oriPps->getSPSId());
-  sps = oriParameterSetManager->getSPS(pps->getSPSId());
-  //sps = parameterSetManager->getSPS(pps->getSPSId());
+  sps = psManager->getSPS(pps->getSPSId());
 	pcSlice->setSPS(sps); // edit JW
   //!KS: need to add error handling code here, if SPS is not available
   assert(sps!=0);
@@ -1055,7 +1048,6 @@ Void TDecCavlc::parseSliceHeader(
   {
     pcSlice->setDependentSliceSegmentFlag(false);
   }
-  //Int numCTUs = ((oriSps->getPicWidthInLumaSamples() + oriSps->getMaxCUWidth() - 1) / oriSps->getMaxCUWidth())*((oriSps->getPicHeightInLumaSamples() + oriSps->getMaxCUHeight() - 1) / oriSps->getMaxCUHeight());
   Int numCTUs = ((sps->getPicWidthInLumaSamples() + sps->getMaxCUWidth() - 1) / sps->getMaxCUWidth())*
     ((sps->getPicHeightInLumaSamples() + sps->getMaxCUHeight() - 1) / sps->getMaxCUHeight());
   UInt sliceSegmentAddress = 0;
@@ -1148,7 +1140,7 @@ Void TDecCavlc::parseSliceHeader(
 			pcSlice->setShortTermRefPicSetSpsFlag(uiCode == 1 ? true : false);
       if(uiCode == 0) // use short-term reference picture set explicitly signalled in slice header
       {
-        parseShortTermRefPicSet(sps,rps, sps->getRPSList()->getNumberOfReferencePictureSets(), pcSlice, true);
+        parseShortTermRefPicSet(sps, rps, sps->getRPSList()->getNumberOfReferencePictureSets(), pcSlice, true);
       }
       else // use reference to short-term reference picture set in PPS
       {
@@ -1195,7 +1187,7 @@ Void TDecCavlc::parseSliceHeader(
         rps->setNumberOfLongtermPictures(numOfLtrp);
         Int maxPicOrderCntLSB = 1 << sps->getBitsForPOC();
         Int prevDeltaMSB = 0, deltaPocMSBCycleLT = 0;
-				//////////////////////////////////////////////////////////////////////// start point
+
 				pcSlice->setOffsetPlusNumberOfLongtermPictures(offset + rps->getNumberOfLongtermPictures());
 				pcSlice->setNumOfLtrp(numOfLtrp);
 				pcSlice->setNumLtrpInSPS(numLtrpInSPS);
@@ -1204,6 +1196,7 @@ Void TDecCavlc::parseSliceHeader(
 				pcSlice->setUsedByCurrPicFlag(numOfLtrp);
 				pcSlice->setDeltaPocMsbPresentFlag(numOfLtrp);
 				pcSlice->setDeltaPocMsbCycleLt(numOfLtrp);
+
         for(Int j=offset+rps->getNumberOfLongtermPictures()-1, k = 0; k < numOfLtrp; j--, k++)
         {
           Int pocLsbLt;
@@ -1249,7 +1242,7 @@ Void TDecCavlc::parseSliceHeader(
               deltaPocMSBCycleLT = uiCode + prevDeltaMSB;
             }
 
-          //  Int pocLTCurr = pcSlice->getPOC() - deltaPocMSBCycleLT * maxPicOrderCntLSB
+            //  Int pocLTCurr = pcSlice->getPOC() - deltaPocMSBCycleLT * maxPicOrderCntLSB
             //                            - iPOClsb + pocLsbLt;
             //rps->setPOC     (j, pocLTCurr);
             //rps->setDeltaPOC(j, - pcSlice->getPOC() + pocLTCurr);
@@ -1491,9 +1484,7 @@ Void TDecCavlc::parseSliceHeader(
 			pcSlice->setFiveMinusMaxNumMergeCand(uiCode);
     }
 
-		//인코더에서 Slice_qp_delta 확인
     READ_SVLC( iCode, "slice_qp_delta" );
-		
     pcSlice->setSliceQp (26 + pps->getPicInitQPMinus26() + iCode);
 		pcSlice->setExtSliceQpDelta(iCode);
 
@@ -1592,7 +1583,8 @@ Void TDecCavlc::parseSliceHeader(
   }
 
   std::vector<UInt> entryPointOffset;
-	//이부분은 tile이 한개일 때 의미가 없어질 수 있다. Read시에는 읽어야 헤더를 제외한 rbsp를 구해야하니까 읽고, Write시에는 무시하는 것 고려.
+	//이부분은 tile이 한개일 때 의미가 없어질 수 있다. Read시에는 읽어야 헤더를 제외한 rbsp를 구해야하니까 읽고, 
+  // Write시에는 무시하는 것 고려.
 	// if (oriPps->getTilesEnabledFlag() || oriPps->getEntropyCodingSyncEnabledFlag())
   if (pps->getTilesEnabledFlag() || pps->getEntropyCodingSyncEnabledFlag())
   {
@@ -1623,11 +1615,11 @@ Void TDecCavlc::parseSliceHeader(
       UInt ignore;
       READ_CODE(8,ignore,"slice_segment_header_extension_data_byte");
     }
-  }
+  } 
 #if RExt__DECODER_DEBUG_BIT_STATISTICS
   TComCodingStatistics::IncrementStatisticEP(STATS__BYTE_ALIGNMENT_BITS,m_pcBitstream->readByteAlignment(),0);
 #else
-  //m_pcBitstream->readByteAlignment();
+  m_pcBitstream->readByteAlignment();
 #endif
 
   pcSlice->clearSubstreamSizes();

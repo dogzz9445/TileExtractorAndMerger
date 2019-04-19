@@ -35,10 +35,6 @@ Void NalStream::addFile(const char* filename)
   mByteStream = new InputByteStream(mStream);
 }
 
-
-
-
-
 Void NalStream::readNALUnit(InputNALUnit& nalu)
 {
   byteStreamNALUnit(*mByteStream, nalu.getBitstream().getFifo(), mStats);

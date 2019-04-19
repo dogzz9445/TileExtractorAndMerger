@@ -1186,7 +1186,7 @@ Void TEncCavlc::codeSliceHeader(TComSlice* pcSlice)
     "numCTUs: " << numCTUs << std::endl;
 	//UInt sliceSegmentAddress = 0;
   //calculate number of bits required for slice address
-  Int maxSliceSegmentAddress = pcSlice->getPic()->getNumberOfCtusInFrame();
+  //Int maxSliceSegmentAddress = pcSlice->getPic()->getNumberOfCtusInFrame();
 	Int bitsSliceSegmentAddress = 0;
   while (numCTUs>(1 << bitsSliceSegmentAddress))
 	{

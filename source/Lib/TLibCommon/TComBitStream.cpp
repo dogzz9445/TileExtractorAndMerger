@@ -396,15 +396,15 @@ TComInputBitstream *TComInputBitstream::extractSubstream( UInt uiNumBits )
 UInt TComInputBitstream::readByteAlignment()
 {
   UInt code = 0;
-  read( 1, code );
-  assert(code == 1);
+  //read( 1, code );
+  //assert(code == 1);
 
   UInt numBits = getNumBitsUntilByteAligned();
   if(numBits)
   {
     assert(numBits <= getNumBitsLeft());
     read( numBits, code );
-    assert(code == 0);
+    //assert(code == 0);
   }
   return numBits+1;
 }
