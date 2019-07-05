@@ -134,7 +134,8 @@ Void TAppDecTop::merge(Int sizeGOP)
   m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
   m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
 
-  if (mergedFile.is_open())
+  int a = 0;
+  while (mergedFile.is_open() && a++ != 17)
   {
     // VPS SPS, PPS 정보 파싱
     for (Int iVPSSPSPPS = 0; iVPSSPSPPS < 3; iVPSSPSPPS++)
@@ -180,12 +181,11 @@ Void TAppDecTop::merge(Int sizeGOP)
 
     xWriteVPSSPSPPS(mergedFile, inVps, inSps, inPps);
 
-    for (Int iFrame = 0; iFrame < /*max frame*/32; iFrame++)
+    for (Int iFrame = 0; iFrame < /*max frame*/sizeGOP+1; iFrame++)
     {
       AccessUnit accessUnit;
       for (Int iTile = 0; iTile < m_numberOfTiles; iTile++)
       {
-        std::cout << "\n";
         InputNALUnit nalu = InputNALUnit();
         m_pNalStreams[iTile].getSliceNAL(nalu);
 
@@ -371,22 +371,17 @@ Void TAppDecTop::xWriteBitstream(
   m_cEntropyCoder.setBitstream(&bsSliceHeader);
   m_cEntropyCoder.encodeSliceHeader(&slice);
   bsSliceHeader.writeByteAlignment();
-  std::cout << nalUnitTypeToString(inNal.m_nalUnitType) << ": " << bsSliceHeader.getByteStreamLength() << std::endl;
 
   vector<uint8_t> outputSliceHeaderBuffer;
   std::size_t outputSliceHeaderAmount = 0;
   outputSliceHeaderAmount = addEmulationPreventionByte(outputSliceHeaderBuffer, bsSliceHeader.getFIFO());
   // bsSliceHeader에 add해서 처리할 수 있도록
 
-  std::cout << "SliceHeaderAmount: " << outputSliceHeaderAmount << std::endl;
-
   out.write(reinterpret_cast<const TChar*>(&(*outputSliceHeaderBuffer.begin())), outputSliceHeaderAmount);
 
   TComInputBitstream** ppcSubstreams = NULL;
   TComInputBitstream*  pcBitstream = &(inNal.getBitstream());
   const UInt uiNumSubstreams = slice.getNumberOfSubstreamSizes() + 1;
-
-  std::cout << "uiNumSubstream: " << uiNumSubstreams << std::endl;
 
   // init each couple {EntropyDecoder, Substream}
   ppcSubstreams = new TComInputBitstream*[uiNumSubstreams];
@@ -402,18 +397,7 @@ Void TAppDecTop::xWriteBitstream(
   std::size_t outputRbspHeaderAmount = 0;
   outputRbspHeaderAmount = addEmulationPreventionByte(outputSliceRbspBuffer, sliceRbspBuf);
 
-  std::cout << "SliceRbspAmount: " << outputRbspHeaderAmount << std::endl;
-
   out.write(reinterpret_cast<const TChar*>(&(*outputSliceRbspBuffer.begin())), outputRbspHeaderAmount);
-  //TComInputBitstream* pcBitstream = &(inNal.getBitstream());
-  //pcBitstream->extractSubstream();
-  //const UInt
-
-  //std::size_t outputRbspHeaderAmout = 0;
-  //outputRbspHeaderAmount = addEmulationPreventionByte(outputSliceRbspBuffer, sliceRbspBuf);
-  //std::cout << "read bytes: " << pcBitstream->getNumBitsRead() << std::endl
-  //  << "left bytes: " << pcBitstream->getNumBitsLeft() << std::endl;
-  //out.write(reinterpret_cast<const TChar*>(pcBitstream + (pcBitstream->getNumBitsRead() / 8)), pcBitstream->getNumBitsLeft());
 }
 
 

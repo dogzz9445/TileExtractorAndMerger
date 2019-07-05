@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
   //}
 
   // call decoding function
-  cTAppDecTop.merge(32);
+  cTAppDecTop.merge(16);
 
   // destroy application decoder class
   cTAppDecTop.destroy();

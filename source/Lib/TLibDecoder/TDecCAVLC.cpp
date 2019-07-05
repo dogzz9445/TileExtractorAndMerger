@@ -72,7 +72,7 @@ Void  xTraceSliceHeader ()
 #endif
 
 // Dongmin Jang
-#define DONG_MSG(code, msg) { std::cout << msg << ": " << (int)(code) << std::endl; }
+#define DONG_MSG(code, msg) { /*std::cout << msg << ": " << (int)(code) << std::endl;*/ }
 
 // ====================================================================================================================
 // Constructor / destructor / create / destroy

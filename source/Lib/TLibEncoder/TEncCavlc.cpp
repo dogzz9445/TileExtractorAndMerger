@@ -39,7 +39,7 @@
 #include "TEncCavlc.h"
 #include "SEIwrite.h"
 
-#define msg(code, msg) { std::cout << msg << ": " << (int)(code) << std::endl; }
+#define msg(code, msg) { /*std::cout << msg << ": " << (int)(code) << std::endl;*/ }
 
 //! \ingroup TLibEncoder
 //! \{
@@ -1572,6 +1572,8 @@ Void TEncCavlc::codeSliceHeader(TComSlice* pcSlice)
     WRITE_UVLC(0, "slice_segment_header_extension_length");
     msg(0, "slice_segment_header_extension_length")
   }
+
+  WRITE_CODE(1, 1, "align");
 	
 	
 }
