@@ -1,6 +1,4 @@
 
-
-
 #include "SliceAddressTsRsOrder.h"
 
 SliceAddressTsRsOrder::SliceAddressTsRsOrder()
@@ -52,8 +50,6 @@ Void SliceAddressTsRsOrder::create(const TComSPS *sps, const TComPPS *pps)
 
 Void SliceAddressTsRsOrder::destroy()
 {
-
-
 	delete[] m_ctuTsToRsAddrMap;
 	m_ctuTsToRsAddrMap = NULL;
 

@@ -39,7 +39,8 @@ Void NalStream::readNALUnit(InputNALUnit& nalu)
 {
   byteStreamNALUnit(*mByteStream, nalu.getBitstream().getFifo(), mStats);
 
-  read(nalu);
+  read(nalu); 
+
   if (nalu.getBitstream().getFifo().empty())
   {
     std::cerr << "Waring: Attempt to decode an empty NAL unit\n";
@@ -66,8 +67,8 @@ Void NalStream::readNALUnit(InputNALUnit& nalu)
     TComSPS*		sps = new TComSPS();
     mEntropyDecoder.decodeSPS(sps);
     //Test
-    sps->setPicWidthInLumaSamples(512);
-    sps->setPicHeightInLumaSamples(320);
+    sps->setPicWidthInLumaSamples(3840);
+    sps->setPicHeightInLumaSamples(1920);
 
     mParameterSetManager.storeSPS(sps, nalu.getBitstream().getFifo());
 

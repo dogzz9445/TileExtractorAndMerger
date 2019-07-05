@@ -64,6 +64,7 @@
 #include "TLibEncoder/NALwrite.h"
 
 #include "NalStream.h"
+#include "TilePartition.h"
 
 //! \ingroup TAppDecoder
 //! \{
@@ -76,8 +77,6 @@
 class TAppDecTop : public TAppDecCfg
 {
 private:
-  
-	//editJW
 	SEIReader												m_seiReader;
 	std::ostream									 *m_pSEIOutputStream;
   TEncEntropy											m_cEntropyCoder;
@@ -93,7 +92,8 @@ private:
 	
   std::ofstream                   m_seiMessageFileStream;         ///< Used for outputing SEI messages.
 
-  NalStream                       *m_pNalStreams;
+  NalStream                      *m_pNalStreams;
+  TilePartitionManager            m_tilePartitionManager;
 
 public:
   TAppDecTop();
@@ -101,23 +101,19 @@ public:
 
   Void  create            (); ///< create internal members
   Void  destroy           (); ///< destroy internal members
-  Void  merge             (); ///< main decoding function
+  Void  merge             (Int sizeGOP); ///< main decoding function
 
-	//edit JW
 	Void  setSEIMessageOutputStream(std::ostream *pOpStream) { m_pSEIOutputStream = pOpStream; }
 
 protected:
-  Void  xInitDecLib       (); ///< initialize decoder class
   Void  xInitLogSEI       ();
 
 private:
-	//edit JW
 	std::size_t addEmulationPreventionByte(vector<uint8_t>& outputBuffer, vector<uint8_t>& rbsp);
 	Void writeParameter(fstream& out, NalUnitType nalUnitType, UInt temporalId, UInt nuhLayerId, vector<uint8_t>& rbsp, ParameterSetManager& parameterSetmanager);
   Void replaceParameter(fstream& out, SEIMCTSExtractionInfoSets& sei, Int mctsEisIdTarget, Int mctsSetIdxTarget, ParameterSetManager& parameterSetmanager);
 	Void writeSlice(fstream& out, InputNALUnit& nalu, TComSlice* pcSlice);
 
-  //edit DM
   Void xWriteVPSSPSPPS(std::ostream& out, const TComVPS* vps, const TComSPS* sps, const TComPPS* pps);
   Void xWriteVPS(AccessUnit& accessUnit, const TComVPS* vps);
   Void xWriteSPS(AccessUnit& accessUnit, const TComSPS* sps);

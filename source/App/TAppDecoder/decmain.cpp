@@ -64,9 +64,17 @@ int main(int argc, char* argv[])
     return returnCode;
   }
 
+  //std::string mOutBitstreamFileName(cTAppDecTop.);
+
+  //fstream mergedFile(m_outBitstreamFileName, fstream::binary | fstream::out);
+  //if (!mergedFile)
+  //{
+  //  std::cerr << "\nfailed to open bitstream file for writing\n";
+  //  exit(EXIT_FAILURE);
+  //}
 
   // call decoding function
-  cTAppDecTop.merge();
+  cTAppDecTop.merge(32);
 
   // destroy application decoder class
   cTAppDecTop.destroy();

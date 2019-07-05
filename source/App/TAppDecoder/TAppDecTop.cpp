@@ -67,7 +67,8 @@ TAppDecTop::TAppDecTop()
  ,m_manageSliceAddress()
  ,m_extSPSId()
  ,m_extPPSId()
- , m_pNalStreams(NULL)
+ ,m_pNalStreams(NULL)
+ ,m_tilePartitionManager()
 {
 }
 
@@ -98,7 +99,7 @@ Void TAppDecTop::destroy()
  - destroy internal class
  .
  */
-Void TAppDecTop::merge()
+Void TAppDecTop::merge(Int sizeGOP)
 {
   m_pNalStreams = new NalStream[m_numberOfTiles];
   for (int i = 0; i < m_numberOfTiles; i++)
@@ -106,13 +107,6 @@ Void TAppDecTop::merge()
     m_pNalStreams[i].addFile(m_inBitstreamFileNames[i].c_str());
   }
 
-  xInitDecLib(); 
-  xInitLogSEI();
-
-  m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
-  m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
-
-  // Output Stream
   fstream mergedFile(m_outBitstreamFileName, fstream::binary | fstream::out);
   if (!mergedFile)
   {
@@ -120,8 +114,26 @@ Void TAppDecTop::merge()
     exit(EXIT_FAILURE);
   }
 
-//---------GOP 단위로 MERGING---------------------------
-//---------VPS, SPS, PPS-------------------------------
+  m_tilePartitionManager.setNumTiles(m_numberOfTiles);
+  m_tilePartitionManager.setNumTilesInColumn(m_numberOfTilesInColumn);
+  m_tilePartitionManager.setNumTilesInRow(m_numberOfTilesInRow);
+  m_tilePartitionManager.setEntireWidth(m_iTargetWidth);
+  m_tilePartitionManager.setEntireHeight(m_iTargetHeight);
+  m_tilePartitionManager.setTileUniformSpacingFlag(m_tileUniformFlag);
+
+  if (!m_tileUniformFlag)
+  {
+    std::vector<Int> tileWidths;
+    std::vector<Int> tileHeights;
+    //m_tilePartitionManager.setTileWidths();
+    //m_tilePartitionManager.setTileHeights();
+  }
+
+  xInitLogSEI();
+
+  m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
+  m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
+
   if (mergedFile.is_open())
   {
     // VPS SPS, PPS 정보 파싱
@@ -135,28 +147,30 @@ Void TAppDecTop::merge()
     }
 
     std::cout << "Writing VPS SPS PPS...\n";
-    // VPS, SPS, PPS 정보 믹싱, 쓰기
-    // FIXME:
-    // first VPS, SPS, PPS 파싱해오는게 아니게 고쳐야됨
-    // VPS, SPS, PPS 정보 믹싱
     InputNALUnit nalu_ivps;
     TComVPS* inVps = m_pNalStreams[0].getVPS(nalu_ivps);
     InputNALUnit nalu_isps;
     TComSPS* inSps = m_pNalStreams[0].getSPS(nalu_isps);
     InputNALUnit nalu_ipps;
     TComPPS* inPps = m_pNalStreams[0].getPPS(nalu_ipps);
-      
+
     inSps->setPicWidthInLumaSamples(m_iTargetWidth);
     inSps->setPicHeightInLumaSamples(m_iTargetHeight);
 
     std::vector<Int> tileWidths;
-    tileWidths.push_back(256);
-    tileWidths.push_back(256);
+    tileWidths.push_back(768);
+    tileWidths.push_back(768);
+    tileWidths.push_back(768);
+    tileWidths.push_back(768);
+    tileWidths.push_back(768);
 
     std::vector<Int> tileHeigths;
-    tileHeigths.push_back(128);
-    tileHeigths.push_back(192);
+    tileHeigths.push_back(640);
+    tileHeigths.push_back(640);
+    tileHeigths.push_back(640);
 
+    inPps->setLoopFilterAcrossSlicesEnabledFlag(false);
+    inPps->setLoopFilterAcrossTilesEnabledFlag(true);
     inPps->setTilesEnabledFlag(true);
     inPps->setTileUniformSpacingFlag(true);
     inPps->setTileColumnWidth(tileWidths);
@@ -164,24 +178,17 @@ Void TAppDecTop::merge()
     inPps->setNumTileColumnsMinus1(m_numberOfTilesInColumn - 1);
     inPps->setNumTileRowsMinus1(m_numberOfTilesInRow - 1);
 
-    // FIXME:
-    // VPS, SPS, PPS 수정해서 쓰기
     xWriteVPSSPSPPS(mergedFile, inVps, inSps, inPps);
 
-    //---------FRAME 단위로 SLICE 쓰기---------------------------
-    // FIXME:
-    // GOP 단위로 고쳐야됨
-    // // VPS, SPS, PPS 들어오면
     for (Int iFrame = 0; iFrame < /*max frame*/32; iFrame++)
     {
       AccessUnit accessUnit;
       for (Int iTile = 0; iTile < m_numberOfTiles; iTile++)
       {
+        std::cout << "\n";
         InputNALUnit nalu = InputNALUnit();
         m_pNalStreams[iTile].getSliceNAL(nalu);
 
-        // FIXME:
-        // SEI Message면 다시 읽기
         while (nalu.m_nalUnitType == NAL_UNIT_PREFIX_SEI)
         {
           if (iTile == 0)
@@ -267,19 +274,11 @@ Void TAppDecTop::xWriteBitstream(
   slice.setTemporalLayerNonReferenceFlag(nonReferenceFlag);
   slice.setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
   slice.setTLayerInfo(inNal.m_temporalId);
-  slice.setLFCrossSliceBoundaryFlag(false);
 
   m_cEntropyDecoder.decodeSliceHeader(&slice, nalStream->getParameterSetManager(), &m_parameterSetManager, 0);
   
-  std::cout << "read bytes: " << inNal.getBitstream().getNumBitsRead() << std::endl
-    << "left bytes: " << inNal.getBitstream().getNumBitsLeft() << std::endl;
-  
-  Int EntireWidth = 512;
-  Int EntireHeight = 320;
-
-  // slice.getSPS()->setPicWidthInLumaSamples(EntireWidth);
-  // slice.getSPS()->setPicHeightInLumaSamples(EntireHeight);
-
+  Int EntireWidth = 3840;
+  Int EntireHeight = 1920;
 
   if (tileId == 0)
   {
@@ -287,15 +286,59 @@ Void TAppDecTop::xWriteBitstream(
   }
   else if (tileId == 1)
   {
-    slice.setSliceSegmentRsAddress(4);
+    slice.setSliceSegmentRsAddress(12);
   }
   else if (tileId == 2)
   {
-    slice.setSliceSegmentRsAddress(16);
+    slice.setSliceSegmentRsAddress(24);
   }
   else if (tileId == 3)
   {
-    slice.setSliceSegmentRsAddress(20);
+    slice.setSliceSegmentRsAddress(36);
+  }
+  else if (tileId == 4)
+  {
+    slice.setSliceSegmentRsAddress(48);
+  }
+  else if (tileId == 5)
+  {
+    slice.setSliceSegmentRsAddress(600);
+  }
+  else if (tileId == 6)
+  {
+    slice.setSliceSegmentRsAddress(612);
+  }
+  else if (tileId == 7)
+  {
+    slice.setSliceSegmentRsAddress(624);
+  }
+  else if (tileId == 8)
+  {
+    slice.setSliceSegmentRsAddress(636);
+  }
+  else if (tileId == 9)
+  {
+    slice.setSliceSegmentRsAddress(648);
+  }
+  else if (tileId == 10)
+  {
+    slice.setSliceSegmentRsAddress(1200);
+  }
+  else if (tileId == 11)
+  {
+    slice.setSliceSegmentRsAddress(1212);
+  }
+  else if (tileId == 12)
+  {
+    slice.setSliceSegmentRsAddress(1224);
+  }
+  else if (tileId == 13)
+  {
+    slice.setSliceSegmentRsAddress(1236);
+  }
+  else if (tileId == 14)
+  {
+    slice.setSliceSegmentRsAddress(1248);
   }
 
   if (slice.getSliceType() == I_SLICE)
@@ -321,7 +364,6 @@ Void TAppDecTop::xWriteBitstream(
   bsNALUHeader.write(inNal.m_nuhLayerId, 6);   // nuh_layer_id
   bsNALUHeader.write(inNal.m_temporalId + 1, 3); // nuh_temporal_id_plus1
 
-  std::cout << nalUnitTypeToString(inNal.m_nalUnitType) << ": " << bsNALUHeader.getByteStreamLength() << std::endl;
   out.write(reinterpret_cast<const TChar*>(bsNALUHeader.getByteStream()), bsNALUHeader.getByteStreamLength());
 
   TComOutputBitstream bsSliceHeader;
@@ -329,11 +371,14 @@ Void TAppDecTop::xWriteBitstream(
   m_cEntropyCoder.setBitstream(&bsSliceHeader);
   m_cEntropyCoder.encodeSliceHeader(&slice);
   bsSliceHeader.writeByteAlignment();
+  std::cout << nalUnitTypeToString(inNal.m_nalUnitType) << ": " << bsSliceHeader.getByteStreamLength() << std::endl;
 
   vector<uint8_t> outputSliceHeaderBuffer;
   std::size_t outputSliceHeaderAmount = 0;
   outputSliceHeaderAmount = addEmulationPreventionByte(outputSliceHeaderBuffer, bsSliceHeader.getFIFO());
   // bsSliceHeader에 add해서 처리할 수 있도록
+
+  std::cout << "SliceHeaderAmount: " << outputSliceHeaderAmount << std::endl;
 
   out.write(reinterpret_cast<const TChar*>(&(*outputSliceHeaderBuffer.begin())), outputSliceHeaderAmount);
 
@@ -341,10 +386,13 @@ Void TAppDecTop::xWriteBitstream(
   TComInputBitstream*  pcBitstream = &(inNal.getBitstream());
   const UInt uiNumSubstreams = slice.getNumberOfSubstreamSizes() + 1;
 
+  std::cout << "uiNumSubstream: " << uiNumSubstreams << std::endl;
+
   // init each couple {EntropyDecoder, Substream}
   ppcSubstreams = new TComInputBitstream*[uiNumSubstreams];
   for (UInt ui = 0; ui < uiNumSubstreams; ui++)
   {
+    Int a = pcBitstream->getNumBitsLeft();
     ppcSubstreams[ui] = pcBitstream->extractSubstream(ui + 1 < uiNumSubstreams ? (slice.getSubstreamSize(ui) << 3) : pcBitstream->getNumBitsLeft());
     //ppcSubstreams[ui] = pcBitstream->extractSubstream(slice.getSubstreamSize(ui) << 3);
   }
@@ -354,7 +402,18 @@ Void TAppDecTop::xWriteBitstream(
   std::size_t outputRbspHeaderAmount = 0;
   outputRbspHeaderAmount = addEmulationPreventionByte(outputSliceRbspBuffer, sliceRbspBuf);
 
+  std::cout << "SliceRbspAmount: " << outputRbspHeaderAmount << std::endl;
+
   out.write(reinterpret_cast<const TChar*>(&(*outputSliceRbspBuffer.begin())), outputRbspHeaderAmount);
+  //TComInputBitstream* pcBitstream = &(inNal.getBitstream());
+  //pcBitstream->extractSubstream();
+  //const UInt
+
+  //std::size_t outputRbspHeaderAmout = 0;
+  //outputRbspHeaderAmount = addEmulationPreventionByte(outputSliceRbspBuffer, sliceRbspBuf);
+  //std::cout << "read bytes: " << pcBitstream->getNumBitsRead() << std::endl
+  //  << "left bytes: " << pcBitstream->getNumBitsLeft() << std::endl;
+  //out.write(reinterpret_cast<const TChar*>(pcBitstream + (pcBitstream->getNumBitsRead() / 8)), pcBitstream->getNumBitsLeft());
 }
 
 
@@ -454,11 +513,6 @@ Void TAppDecTop::writeParameter(fstream& out, NalUnitType nalUnitType, UInt nuhL
 		m_extPPSId = pps->getPPSId();
 	}
 }
-
-Void TAppDecTop::xInitDecLib()
-{
-}
-
 Void TAppDecTop::xInitLogSEI()
 {
   if (!m_outputDecodedSEIMessagesFilename.empty())
