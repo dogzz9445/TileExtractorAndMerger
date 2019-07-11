@@ -20,6 +20,9 @@
 #include "TLibDecoder/TDecCAVLC.h"
 #include "TLibDecoder/SliceAddressTsRsOrder.h"
 
+#define ENTIRE_WIDTH 3840
+#define ENTIRE_HEIGHT 1920
+
 // PROFILE이 무조건 MAIN 또는 MAIN10 프로파일이어야한다.
 
 class TilePartitionManager

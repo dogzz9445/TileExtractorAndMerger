@@ -1864,8 +1864,8 @@ public:
 
       // work out changed flag
       calculateParameterSetChangedFlag(mapData.bChanged, mapData.pNaluData, pNaluData);
-      delete m_paramsetMap[psId].pNaluData;
-      delete m_paramsetMap[psId].parameterSet;
+      /*delete m_paramsetMap[psId].pNaluData;
+      delete m_paramsetMap[psId].parameterSet;*/
 
       m_paramsetMap[psId].parameterSet = ps;
     }
@@ -1876,7 +1876,7 @@ public:
     }
     if (pNaluData != 0)
     {
-      m_paramsetMap[psId].pNaluData=new std::vector<UChar>;
+      m_paramsetMap[psId].pNaluData = new std::vector<UChar>;
       *(m_paramsetMap[psId].pNaluData) = *pNaluData;
     }
     else

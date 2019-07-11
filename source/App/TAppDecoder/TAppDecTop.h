@@ -79,10 +79,6 @@ class TAppDecTop : public TAppDecCfg
 private:
 	SEIReader												m_seiReader;
 	std::ostream									 *m_pSEIOutputStream;
-  TEncEntropy											m_cEntropyCoder;
-  TDecEntropy											m_cEntropyDecoder;
-  TEncCavlc												m_cCavlcCoder;
-  TDecCavlc												m_cCavlcDecoder;
 	ParameterSetManager*						m_oriParameterSetManager;
 	ParameterSetManager							m_parameterSetManager;
 	SliceAddressTsRsOrder						m_manageSliceAddress;
@@ -113,15 +109,6 @@ private:
 	Void writeParameter(fstream& out, NalUnitType nalUnitType, UInt temporalId, UInt nuhLayerId, vector<uint8_t>& rbsp, ParameterSetManager& parameterSetmanager);
   Void replaceParameter(fstream& out, SEIMCTSExtractionInfoSets& sei, Int mctsEisIdTarget, Int mctsSetIdxTarget, ParameterSetManager& parameterSetmanager);
 	Void writeSlice(fstream& out, InputNALUnit& nalu, TComSlice* pcSlice);
-
-  Void xWriteVPSSPSPPS(std::ostream& out, const TComVPS* vps, const TComSPS* sps, const TComPPS* pps);
-  Void xWriteVPS(AccessUnit& accessUnit, const TComVPS* vps);
-  Void xWriteSPS(AccessUnit& accessUnit, const TComSPS* sps);
-  Void xWritePPS(AccessUnit& accessUnit, const TComPPS* pps);
-  Void xWriteBitstream(std::ostream& out, AccessUnit &accessUnit, InputNALUnit& inNal, NalStream* nalStream, Int& tileId);
-  // TODO:
-  // WriteSEI
-  // Void xWriteSEI(std::ostream& out, OutputNALUnit)
 
 };
 

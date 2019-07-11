@@ -191,7 +191,7 @@ Void   TComOutputBitstream::addSubstream( TComOutputBitstream* pcSubstream )
 
 Void TComOutputBitstream::writeByteAlignment()
 {
-  write( 1, 1);
+  write(1, 1);
   writeAlignZero();
 }
 
@@ -396,8 +396,8 @@ TComInputBitstream *TComInputBitstream::extractSubstream( UInt uiNumBits )
 UInt TComInputBitstream::readByteAlignment()
 {
   UInt code = 0;
-  //read( 1, code );
-  //assert(code == 1);
+  read( 1, code );
+  assert(code == 1);
 
   UInt numBits = getNumBitsUntilByteAligned();
   if(numBits)

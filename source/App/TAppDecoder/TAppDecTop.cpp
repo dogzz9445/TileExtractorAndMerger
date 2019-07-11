@@ -48,9 +48,6 @@
 //! \ingroup TAppDecoder
 //! \{
 
-static const UChar emulation_prevention_three_byte[] = { 3 };
-static const UChar start_code_prefix[] = { 0, 0, 0, 1 };
-
 // ====================================================================================================================
 // Constructor / destructor / initialization / destroy
 // ====================================================================================================================
@@ -58,10 +55,6 @@ static const UChar start_code_prefix[] = { 0, 0, 0, 1 };
 TAppDecTop::TAppDecTop()
 : m_seiReader()
  ,m_pSEIOutputStream(NULL)
- ,m_cCavlcCoder()
- ,m_cCavlcDecoder()
- ,m_cEntropyCoder()
- ,m_cEntropyDecoder()
  ,m_parameterSetManager()
  ,m_oriParameterSetManager()
  ,m_manageSliceAddress()
@@ -101,6 +94,7 @@ Void TAppDecTop::destroy()
  */
 Void TAppDecTop::merge(Int sizeGOP)
 {
+  ParameterSetManager* parameterSetManager = new ParameterSetManager();
   m_pNalStreams = new NalStream[m_numberOfTiles];
   for (int i = 0; i < m_numberOfTiles; i++)
   {
@@ -114,6 +108,7 @@ Void TAppDecTop::merge(Int sizeGOP)
     exit(EXIT_FAILURE);
   }
 
+
   m_tilePartitionManager.setNumTiles(m_numberOfTiles);
   m_tilePartitionManager.setNumTilesInColumn(m_numberOfTilesInColumn);
   m_tilePartitionManager.setNumTilesInRow(m_numberOfTilesInRow);
@@ -121,92 +116,84 @@ Void TAppDecTop::merge(Int sizeGOP)
   m_tilePartitionManager.setEntireHeight(m_iTargetHeight);
   m_tilePartitionManager.setTileUniformSpacingFlag(m_tileUniformFlag);
 
-  if (!m_tileUniformFlag)
+  std::vector<Int> tileWidths;
+  tileWidths.push_back(768);
+  tileWidths.push_back(768);
+  tileWidths.push_back(768);
+  tileWidths.push_back(768);
+  tileWidths.push_back(768);
+
+  std::vector<Int> tileHeights;
+  tileHeights.push_back(640);
+  tileHeights.push_back(640);
+  tileHeights.push_back(640);
+
+  std::vector<Int> tileAddresses;
+  tileAddresses.push_back(0);
+  tileAddresses.push_back(12);
+  tileAddresses.push_back(24);
+  tileAddresses.push_back(36);
+  tileAddresses.push_back(48);
+  tileAddresses.push_back(600);
+  tileAddresses.push_back(612);
+  tileAddresses.push_back(624);
+  tileAddresses.push_back(636);
+  tileAddresses.push_back(648);
+  tileAddresses.push_back(1200);
+  tileAddresses.push_back(1212);
+  tileAddresses.push_back(1224);
+  tileAddresses.push_back(1236);
+  tileAddresses.push_back(1248);
+
+  TComVPS* inVPS = new TComVPS();
+  TComSPS* inSPS = new TComSPS();
+  TComPPS* inPPS = new TComPPS();
+
+  for (Int iTile = 0; iTile < m_numberOfTiles; iTile++)
   {
-    std::vector<Int> tileWidths;
-    std::vector<Int> tileHeights;
-    //m_tilePartitionManager.setTileWidths();
-    //m_tilePartitionManager.setTileHeights();
+    m_pNalStreams[iTile].setTileId(iTile);
+    m_pNalStreams[iTile].setOutputStream(mergedFile);
+    m_pNalStreams[iTile].setParameterPointers(inVPS, inSPS, inPPS);
+    m_pNalStreams[iTile].setTileResolution(tileAddresses, tileWidths, tileHeights);
+    m_pNalStreams[iTile].setParameterSetManager(parameterSetManager);
   }
+
+  clock_t start, end;
+  double result;
+
+  start = clock(); // 시간 측정 시작
 
   xInitLogSEI();
 
-  m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
-  m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
-
-  int a = 0;
-  while (mergedFile.is_open() && a++ != 17)
+  Int frame = 0;
+  while (mergedFile.is_open() && frame++ != 299)
   {
-    // VPS SPS, PPS 정보 파싱
-    for (Int iVPSSPSPPS = 0; iVPSSPSPPS < 3; iVPSSPSPPS++)
+    for (Int iTile = 0; iTile < m_numberOfTiles; iTile++)
     {
-      for (Int iTile = 0; iTile < m_numberOfTiles; iTile++)
-      {
-        InputNALUnit nalu;
-        m_pNalStreams[iTile].readNALUnit(nalu);
-      }
+      m_pNalStreams[iTile].readNALUnit();
     }
+  }
 
-    std::cout << "Writing VPS SPS PPS...\n";
-    InputNALUnit nalu_ivps;
-    TComVPS* inVps = m_pNalStreams[0].getVPS(nalu_ivps);
-    InputNALUnit nalu_isps;
-    TComSPS* inSps = m_pNalStreams[0].getSPS(nalu_isps);
-    InputNALUnit nalu_ipps;
-    TComPPS* inPps = m_pNalStreams[0].getPPS(nalu_ipps);
+  end = clock(); //시간 측정 끝
+  result = (double)(end - start);
+  printf("%d", static_cast<int>(result));
 
-    inSps->setPicWidthInLumaSamples(m_iTargetWidth);
-    inSps->setPicHeightInLumaSamples(m_iTargetHeight);
-
-    std::vector<Int> tileWidths;
-    tileWidths.push_back(768);
-    tileWidths.push_back(768);
-    tileWidths.push_back(768);
-    tileWidths.push_back(768);
-    tileWidths.push_back(768);
-
-    std::vector<Int> tileHeigths;
-    tileHeigths.push_back(640);
-    tileHeigths.push_back(640);
-    tileHeigths.push_back(640);
-
-    inPps->setLoopFilterAcrossSlicesEnabledFlag(false);
-    inPps->setLoopFilterAcrossTilesEnabledFlag(true);
-    inPps->setTilesEnabledFlag(true);
-    inPps->setTileUniformSpacingFlag(true);
-    inPps->setTileColumnWidth(tileWidths);
-    inPps->setTileRowHeight(tileHeigths);
-    inPps->setNumTileColumnsMinus1(m_numberOfTilesInColumn - 1);
-    inPps->setNumTileRowsMinus1(m_numberOfTilesInRow - 1);
-
-    xWriteVPSSPSPPS(mergedFile, inVps, inSps, inPps);
-
-    for (Int iFrame = 0; iFrame < /*max frame*/sizeGOP+1; iFrame++)
-    {
-      AccessUnit accessUnit;
-      for (Int iTile = 0; iTile < m_numberOfTiles; iTile++)
-      {
-        InputNALUnit nalu = InputNALUnit();
-        m_pNalStreams[iTile].getSliceNAL(nalu);
-
-        while (nalu.m_nalUnitType == NAL_UNIT_PREFIX_SEI)
-        {
-          if (iTile == 0)
-          {
-            vector<uint8_t> outputBuffer;
-            std::size_t outputAmount = 0;
-            outputAmount = addEmulationPreventionByte(outputBuffer, nalu.getBitstream().getFifo());
-            mergedFile.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
-            mergedFile.write(reinterpret_cast<const TChar*>(&(*outputBuffer.begin())), outputAmount);
-          }
-          nalu = InputNALUnit();
-          m_pNalStreams[iTile].getSliceNAL(nalu);
-        }
-
-        xWriteBitstream(mergedFile, accessUnit, nalu, &m_pNalStreams[iTile], iTile);
-      }
-    } 
-  } 
+  if (inVPS)
+  {
+    delete inVPS;
+  }
+  if (inPPS)
+  {
+    delete inPPS;
+  }
+  if (inSPS)
+  {
+    delete inSPS;
+  }
+  if (parameterSetManager)
+  {
+    delete parameterSetManager;
+  }
 
   mergedFile.close();
   mergedFile.clear();
@@ -215,191 +202,6 @@ Void TAppDecTop::merge(Int sizeGOP)
 // ====================================================================================================================
 // Protected member functions
 // ====================================================================================================================
-
-Void TAppDecTop::xWriteVPSSPSPPS(std::ostream& out, const TComVPS* vps, const TComSPS* sps, const TComPPS* pps)
-{
-  AccessUnit accessUnit;
-  xWriteVPS(accessUnit, vps);
-  xWriteSPS(accessUnit, sps);
-  xWritePPS(accessUnit, pps);
-
-  const vector<UInt>& statsTop = writeAnnexB(out, accessUnit);
-}
-
-Void TAppDecTop::xWriteVPS(AccessUnit &accessUnit, const TComVPS* vps)
-{
-  OutputNALUnit nalu_VPS(NAL_UNIT_VPS);
-  m_cEntropyCoder.setBitstream(&(nalu_VPS.m_Bitstream));
-  m_cEntropyCoder.encodeVPS(vps);
-  accessUnit.push_back(new NALUnitEBSP(nalu_VPS));
-}
-
-Void TAppDecTop::xWriteSPS(AccessUnit &accessUnit, const TComSPS* sps)
-{
-  OutputNALUnit nalu_SPS(NAL_UNIT_SPS);
-  m_cEntropyCoder.setBitstream(&(nalu_SPS.m_Bitstream));
-  m_cEntropyCoder.encodeSPS(sps);
-  accessUnit.push_back(new NALUnitEBSP(nalu_SPS));
-}
-
-Void TAppDecTop::xWritePPS(AccessUnit &accessUnit, const TComPPS* pps)
-{
-  OutputNALUnit nalu_PPS(NAL_UNIT_PPS);
-  m_cEntropyCoder.setBitstream(&(nalu_PPS.m_Bitstream));
-  m_cEntropyCoder.encodePPS(pps);
-  accessUnit.push_back(new NALUnitEBSP(nalu_PPS));
-}
-
-Void TAppDecTop::xWriteBitstream(
-  std::ostream& out, 
-  AccessUnit&   accessUnit, 
-  InputNALUnit& inNal, 
-  NalStream*    nalStream, 
-  Int&          tileId)
-{
-  m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
-  m_cEntropyDecoder.setBitstream(&inNal.getBitstream());
-
-  TComSlice slice;
-  slice.initSlice();
-  slice.setNalUnitType(inNal.m_nalUnitType);
-
-  Bool nonReferenceFlag = (
-    slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_TRAIL_N ||
-    slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_TSA_N ||
-    slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_STSA_N ||
-    slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_RADL_N ||
-    slice.getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N
-    );
-  slice.setTemporalLayerNonReferenceFlag(nonReferenceFlag);
-  slice.setReferenced(true); // Putting this as true ensures that picture is referenced the first time it is in an RPS
-  slice.setTLayerInfo(inNal.m_temporalId);
-
-  m_cEntropyDecoder.decodeSliceHeader(&slice, nalStream->getParameterSetManager(), &m_parameterSetManager, 0);
-  
-  Int EntireWidth = 3840;
-  Int EntireHeight = 1920;
-
-  if (tileId == 0)
-  {
-    slice.setSliceSegmentRsAddress(0);
-  }
-  else if (tileId == 1)
-  {
-    slice.setSliceSegmentRsAddress(12);
-  }
-  else if (tileId == 2)
-  {
-    slice.setSliceSegmentRsAddress(24);
-  }
-  else if (tileId == 3)
-  {
-    slice.setSliceSegmentRsAddress(36);
-  }
-  else if (tileId == 4)
-  {
-    slice.setSliceSegmentRsAddress(48);
-  }
-  else if (tileId == 5)
-  {
-    slice.setSliceSegmentRsAddress(600);
-  }
-  else if (tileId == 6)
-  {
-    slice.setSliceSegmentRsAddress(612);
-  }
-  else if (tileId == 7)
-  {
-    slice.setSliceSegmentRsAddress(624);
-  }
-  else if (tileId == 8)
-  {
-    slice.setSliceSegmentRsAddress(636);
-  }
-  else if (tileId == 9)
-  {
-    slice.setSliceSegmentRsAddress(648);
-  }
-  else if (tileId == 10)
-  {
-    slice.setSliceSegmentRsAddress(1200);
-  }
-  else if (tileId == 11)
-  {
-    slice.setSliceSegmentRsAddress(1212);
-  }
-  else if (tileId == 12)
-  {
-    slice.setSliceSegmentRsAddress(1224);
-  }
-  else if (tileId == 13)
-  {
-    slice.setSliceSegmentRsAddress(1236);
-  }
-  else if (tileId == 14)
-  {
-    slice.setSliceSegmentRsAddress(1248);
-  }
-
-  if (slice.getSliceType() == I_SLICE)
-  {
-    out.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
-  }
-  else
-  {
-    if (slice.getCountTile() == 0)
-    {
-      out.write(reinterpret_cast<const TChar*>(start_code_prefix), 4);
-    }
-    else
-    {
-      out.write(reinterpret_cast<const TChar*>(start_code_prefix + 1), 3);
-    }
-  }
-
-  TComOutputBitstream bsNALUHeader;
-
-  bsNALUHeader.write(0, 1);                    // forbidden_zero_bit
-  bsNALUHeader.write(inNal.m_nalUnitType, 6);  // nal_unit_type
-  bsNALUHeader.write(inNal.m_nuhLayerId, 6);   // nuh_layer_id
-  bsNALUHeader.write(inNal.m_temporalId + 1, 3); // nuh_temporal_id_plus1
-
-  out.write(reinterpret_cast<const TChar*>(bsNALUHeader.getByteStream()), bsNALUHeader.getByteStreamLength());
-
-  TComOutputBitstream bsSliceHeader;
-  m_cEntropyCoder.setEntropyCoder(&m_cCavlcCoder);
-  m_cEntropyCoder.setBitstream(&bsSliceHeader);
-  m_cEntropyCoder.encodeSliceHeader(&slice);
-  bsSliceHeader.writeByteAlignment();
-
-  vector<uint8_t> outputSliceHeaderBuffer;
-  std::size_t outputSliceHeaderAmount = 0;
-  outputSliceHeaderAmount = addEmulationPreventionByte(outputSliceHeaderBuffer, bsSliceHeader.getFIFO());
-  // bsSliceHeader에 add해서 처리할 수 있도록
-
-  out.write(reinterpret_cast<const TChar*>(&(*outputSliceHeaderBuffer.begin())), outputSliceHeaderAmount);
-
-  TComInputBitstream** ppcSubstreams = NULL;
-  TComInputBitstream*  pcBitstream = &(inNal.getBitstream());
-  const UInt uiNumSubstreams = slice.getNumberOfSubstreamSizes() + 1;
-
-  // init each couple {EntropyDecoder, Substream}
-  ppcSubstreams = new TComInputBitstream*[uiNumSubstreams];
-  for (UInt ui = 0; ui < uiNumSubstreams; ui++)
-  {
-    Int a = pcBitstream->getNumBitsLeft();
-    ppcSubstreams[ui] = pcBitstream->extractSubstream(ui + 1 < uiNumSubstreams ? (slice.getSubstreamSize(ui) << 3) : pcBitstream->getNumBitsLeft());
-    //ppcSubstreams[ui] = pcBitstream->extractSubstream(slice.getSubstreamSize(ui) << 3);
-  }
-  vector<uint8_t>& sliceRbspBuf = ppcSubstreams[0]->getFifo();
-
-  vector<uint8_t> outputSliceRbspBuffer;
-  std::size_t outputRbspHeaderAmount = 0;
-  outputRbspHeaderAmount = addEmulationPreventionByte(outputSliceRbspBuffer, sliceRbspBuf);
-
-  out.write(reinterpret_cast<const TChar*>(&(*outputSliceRbspBuffer.begin())), outputRbspHeaderAmount);
-}
-
 
 std::size_t TAppDecTop::addEmulationPreventionByte(vector<uint8_t>& outputBuffer, vector<uint8_t>& rbsp)
 {
@@ -439,64 +241,6 @@ std::size_t TAppDecTop::addEmulationPreventionByte(vector<uint8_t>& outputBuffer
 	return outputAmount;
 }
 
-Void TAppDecTop::writeParameter(fstream& out, NalUnitType nalUnitType, UInt nuhLayerId, UInt temporalId, vector<uint8_t>& rbsp, ParameterSetManager& parameterSetmanager)
-{
-	
-	TComOutputBitstream bsNALUHeader;
-
-	bsNALUHeader.write(0, 1);              // forbidden_zero_bit
-	bsNALUHeader.write(nalUnitType, 6);    // nal_unit_type
-	bsNALUHeader.write(nuhLayerId, 6);     // nuh_layer_id
-	bsNALUHeader.write(temporalId + 1, 3); // nuh_temporal_id_plus1
-
-	out.write(reinterpret_cast<const TChar*>(bsNALUHeader.getByteStream()), bsNALUHeader.getByteStreamLength());
-
-	vector<uint8_t> outputBuffer;
-	std::size_t outputAmount = 0;
-	outputAmount = addEmulationPreventionByte(outputBuffer, rbsp);
-
-	out.write(reinterpret_cast<const TChar*>(&(*outputBuffer.begin())), outputAmount);
-
-	
-	if (nalUnitType == NAL_UNIT_SPS)
-	{
-		TComSPS*		sps = new TComSPS();
-		InputNALUnit nalu;
-		vector<uint8_t>& nalUnitBuf = nalu.getBitstream().getFifo();
-		vector<uint8_t>& nalUnitHeaderBuf = bsNALUHeader.getFIFO();
-		nalUnitBuf.resize(bsNALUHeader.getByteStreamLength() + outputAmount);
-		UChar *NewDataArray = &nalUnitBuf[0];
-		UChar *OldHeaderDataArray = &nalUnitHeaderBuf[0];
-		memcpy(NewDataArray, OldHeaderDataArray, bsNALUHeader.getByteStreamLength());
-		memcpy(NewDataArray + bsNALUHeader.getByteStreamLength(), &outputBuffer[0], outputAmount);
-		read(nalu);
-    m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
-		m_cEntropyDecoder.setBitstream(&(nalu.getBitstream()));
-		m_cEntropyDecoder.decodeSPS(sps);
-		m_parameterSetManager.storeSPS(sps, nalu.getBitstream().getFifo());
-		m_extSPSId = sps->getSPSId();
-		m_extNumCTUs = ((sps->getPicWidthInLumaSamples() + sps->getMaxCUWidth() - 1) / sps->getMaxCUWidth())*((sps->getPicHeightInLumaSamples() + sps->getMaxCUHeight() - 1) / sps->getMaxCUHeight());
-	
-	}
-	else if (nalUnitType == NAL_UNIT_PPS)
-	{
-		TComPPS*		pps = new TComPPS();
-		InputNALUnit nalu;
-		vector<uint8_t>& nalUnitBuf = nalu.getBitstream().getFifo();
-		vector<uint8_t>& nalUnitHeaderBuf = bsNALUHeader.getFIFO();
-		nalUnitBuf.resize(bsNALUHeader.getByteStreamLength() + outputAmount);
-		UChar *NewDataArray = &nalUnitBuf[0];
-		UChar *OldHeaderDataArray = &nalUnitHeaderBuf[0];
-		memcpy(NewDataArray, OldHeaderDataArray, bsNALUHeader.getByteStreamLength());
-		memcpy(NewDataArray + bsNALUHeader.getByteStreamLength(), &outputBuffer[0], outputAmount);
-		read(nalu);
-		m_cEntropyDecoder.setEntropyDecoder(&m_cCavlcDecoder);
-		m_cEntropyDecoder.setBitstream(&(nalu.getBitstream()));
-		m_cEntropyDecoder.decodePPS(pps);
-		m_parameterSetManager.storePPS(pps, nalu.getBitstream().getFifo());
-		m_extPPSId = pps->getPPSId();
-	}
-}
 Void TAppDecTop::xInitLogSEI()
 {
   if (!m_outputDecodedSEIMessagesFilename.empty())

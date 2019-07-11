@@ -513,7 +513,7 @@ Bool TDecTop::xDecodeSlice(InputNALUnit &nalu, Int &iSkipFrame, Int iPOCLastDisp
   const UInt64 originalSymbolCount = g_nSymbolCounter;
 #endif
 
-	m_cEntropyDecoder.decodeSliceHeader(m_apcSlicePilot, &m_parameterSetManager, &m_parameterSetManager, m_prevTid0POC);
+	m_cEntropyDecoder.decodeSliceHeader(m_apcSlicePilot, &m_parameterSetManager, m_prevTid0POC);
 
   // set POC for dependent slices in skipped pictures
   if(m_apcSlicePilot->getDependentSliceSegmentFlag() && m_prevSliceSkipped)
